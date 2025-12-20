@@ -8,10 +8,10 @@ import ArtifactDetails from './components/ArtifactDetails';
 import LoginScreen from './components/LoginScreen';
 import { Artifact, User } from './types';
 
-// Simple Logo Component
+// Simple Logo Component (Trowel Icon)
 const AppLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+    <path d="M12 22L5 9h14l-7 13zM12 9V5M10 2h4v3h-4V2z" />
   </svg>
 );
 
@@ -345,8 +345,8 @@ const App: React.FC = () => {
                  <AppLogo className="w-6 h-6" />
                </div>
                <div className="flex flex-col cursor-pointer">
-                  <h1 className="text-lg font-serif font-bold text-white leading-tight tracking-tight">ArchaeoLog</h1>
-                  <span className="text-[10px] text-stone-400">考古发现出土器物数字档案</span>
+                  <h1 className="text-lg font-serif font-bold text-white leading-tight tracking-tight">Archaeology</h1>
+                  <span className="text-[10px] text-stone-400">考古出土器物数字档案</span>
                </div>
              </div>
              
@@ -566,7 +566,7 @@ const App: React.FC = () => {
                       <div className="absolute bottom-0 left-0 w-24 h-24 bg-stone-700/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
                       <h3 className="text-terra-500 font-serif font-bold text-xl mb-4 relative z-10">数字化出土文档</h3>
                       <p className="text-stone-400 text-xs leading-relaxed mb-8 font-serif italic relative z-10">
-                        " 考古发掘是对人类文明碎片的重构。ArchaeoLog 致力于将每一次铲尖的发现，转化为永恒的数字印记。 "
+                        " 考古发掘是对人类文明碎片的重构。Archaeology 致力于将每一次铲尖的发现，转化为永恒的数字印记。 "
                       </p>
                       <button className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-white border border-stone-700 px-6 py-3 rounded-full hover:bg-white hover:text-stone-900 transition-all uppercase relative z-10">
                          <Camera size={12} /> Professional Archive
