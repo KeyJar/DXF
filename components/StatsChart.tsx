@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Artifact } from '../types';
@@ -39,7 +40,7 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
         break;
       case 'unit':
         // Unit often combined with Site Name for uniqueness, but here we just show 'Unit' string density
-        dataMap = d3.rollup(artifacts, v => v.length, d => d.unit || '未知探方');
+        dataMap = d3.rollup(artifacts, v => v.length, d => d.unit || '未知单位');
         colorHex = "#57534e"; // Stone-600
         break;
       default:
@@ -156,7 +157,7 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
             <p className="text-xs text-stone-400 mt-2">
                 {activeTab === 'material' && '按材质统计'}
                 {activeTab === 'category' && '按器物类别统计'}
-                {activeTab === 'unit' && '按出土单位(探方)统计'}
+                {activeTab === 'unit' && '按出土单位统计'}
             </p>
           </div>
         )}

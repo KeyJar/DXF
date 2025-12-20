@@ -173,7 +173,9 @@ const App: React.FC = () => {
     setShowForm(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); 
+    e.preventDefault();
     if (window.confirm('确定要删除这条记录吗？此操作不可恢复。')) {
       saveArtifacts(artifacts.filter(a => a.id !== id));
       if (selectedId === id) setSelectedId(null);
@@ -518,7 +520,7 @@ const App: React.FC = () => {
                                       <Edit2 size={16} />
                                     </button>
                                     <button 
-                                      onClick={() => handleDelete(item.id)}
+                                      onClick={(e) => handleDelete(e, item.id)}
                                       className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                       title="删除"
                                     >

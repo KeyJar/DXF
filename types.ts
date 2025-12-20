@@ -12,10 +12,7 @@ export interface User {
   password?: string;
   avatarUrl: string;
   displayName: string;
-  settings?: {
-    autoRenameExport?: boolean;
-    exportPath?: string; // New field for custom export folder path
-  };
+  createdAt?: number;
 }
 
 export type ImageType = 'photo' | 'drawing';

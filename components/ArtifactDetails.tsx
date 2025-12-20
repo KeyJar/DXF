@@ -32,14 +32,13 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
+    <div className="flex flex-col h-full bg-white relative animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Left: Image Gallery (Dark Theme) */}
-        <div className="w-full md:w-5/12 lg:w-1/2 bg-stone-900 flex flex-col relative h-[40vh] md:h-auto border-r border-stone-800">
+        {/* Top: Image Gallery (Dark Theme) - Adaptive Height */}
+        <div className="bg-stone-900 flex flex-col relative h-[45%] shrink-0 border-b border-stone-800">
           {/* Header Controls */}
-          <div className="absolute top-0 left-0 right-0 p-4 flex justify-between z-10 bg-gradient-to-b from-black/60 to-transparent">
-             <div className="flex bg-stone-800/80 backdrop-blur-md rounded-lg p-1 border border-stone-700">
+          <div className="absolute top-0 left-0 right-0 p-4 flex justify-between z-10 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+             <div className="flex bg-stone-800/80 backdrop-blur-md rounded-lg p-1 border border-stone-700 pointer-events-auto">
                 <button 
                   onClick={() => { setActiveTab('photo'); setSelectedImageId(null); }}
                   className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-colors ${activeTab === 'photo' ? 'bg-stone-700 text-white shadow-sm' : 'text-stone-400 hover:text-stone-200'}`}
@@ -53,6 +52,11 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
                   <PenTool size={14} /> 线图
                 </button>
              </div>
+             
+             {/* Close button for Split View context */}
+             <button onClick={onClose} className="p-2 bg-black/40 text-white/70 hover:text-white hover:bg-black/60 rounded-full transition-colors pointer-events-auto backdrop-blur-md">
+                <X size={20} />
+             </button>
           </div>
 
           {/* Main Stage */}
@@ -80,45 +84,44 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
 
           {/* Filmstrip */}
           {images.length > 0 && (
-            <div className="h-20 bg-stone-950 border-t border-stone-800 flex items-center gap-2 px-4 overflow-x-auto scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent">
+            <div className="h-16 bg-stone-950 border-t border-stone-800 flex items-center gap-2 px-4 overflow-x-auto scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent shrink-0">
                {images.map(img => (
                  <button 
                    key={img.id}
                    onClick={() => setSelectedImageId(img.id)}
-                   className={`shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-all relative ${
+                   className={`shrink-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all relative ${
                      (currentImage?.id === img.id) ? 'border-terra-500 opacity-100' : 'border-transparent opacity-50 hover:opacity-80'
                    }`}
                  >
                    <img src={img.url} className="w-full h-full object-cover" alt="thumbnail" />
-                   {img.view && (
-                     <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white text-center py-0.5 truncate">
-                       {img.view}
-                     </div>
-                   )}
                  </button>
                ))}
             </div>
           )}
         </div>
 
-        {/* Right: Info Scrollable */}
+        {/* Bottom: Info Scrollable */}
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-           <div className="flex justify-between items-start p-6 border-b border-stone-100 bg-stone-50/50 sticky top-0 z-20 backdrop-blur-sm">
+           <div className="flex justify-between items-start p-6 pb-2 shrink-0">
               <div>
                 <div className="flex items-center gap-2 text-terra-600 font-bold text-xs uppercase tracking-widest mb-1">
                    <MapPin size={12} /> {artifact.siteName}
                 </div>
-                <h2 className="text-3xl font-serif font-bold text-stone-900">{artifact.name}</h2>
+                <h2 className="text-2xl font-serif font-bold text-stone-900">{artifact.name}</h2>
               </div>
-              <button onClick={onClose} className="p-2 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-full transition-colors">
-                <X size={24} />
+              <button 
+                onClick={onEdit} 
+                className="p-2 bg-stone-50 text-stone-600 hover:text-terra-600 hover:bg-terra-50 rounded-lg transition-colors border border-stone-100"
+                title="编辑"
+              >
+                <Edit3 size={18} />
               </button>
            </div>
 
-           <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+           <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6">
               {/* Core Identity */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                 <InfoItem icon={Hash} label="单位/探方" value={artifact.unit} />
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                 <InfoItem icon={Hash} label="单位" value={artifact.unit} />
                  <InfoItem icon={Layers} label="层位" value={artifact.layer} />
                  <InfoItem icon={Tag} label="出土编号" value={artifact.serialNumber} />
                  <InfoItem icon={Calendar} label="出土日期" value={artifact.excavationDate} />
@@ -127,7 +130,7 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
               <hr className="border-stone-100" />
 
               {/* Physical Attributes */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
                  <InfoItem icon={Shapes} label="器类" value={artifact.category} />
                  <InfoItem icon={Box} label="质地" value={artifact.material} />
                  <InfoItem icon={List} label="数量" value={artifact.quantity} />
@@ -136,8 +139,8 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
               </div>
 
               {/* Description Box */}
-              <div className="bg-stone-50 p-6 rounded-xl border border-stone-100">
-                <div className="flex items-center gap-2 text-stone-500 mb-3 font-bold text-xs uppercase tracking-wider">
+              <div className="bg-stone-50 p-5 rounded-xl border border-stone-100">
+                <div className="flex items-center gap-2 text-stone-500 mb-2 font-bold text-xs uppercase tracking-wider">
                   <PenTool size={14} /> 描述记录
                 </div>
                 <p className="text-stone-700 leading-relaxed font-serif text-sm whitespace-pre-line">
@@ -146,7 +149,7 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
               </div>
               
               {/* Personnel */}
-               <div className="flex gap-8 text-xs text-stone-500 pt-4">
+               <div className="flex gap-6 text-xs text-stone-500 pt-2 pb-4">
                   <div className="flex items-center gap-2">
                      <User size={14} className="text-stone-300"/> 
                      <span>发现者: <span className="font-bold text-stone-700">{artifact.finder || '未记录'}</span></span>
@@ -157,24 +160,7 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
                   </div>
                </div>
            </div>
-
-           {/* Footer Actions */}
-           <div className="p-4 border-t border-stone-100 bg-white flex justify-end gap-3 sticky bottom-0 z-20">
-              <button 
-                onClick={onClose} 
-                className="px-6 py-2.5 rounded-xl border border-stone-200 text-stone-500 font-bold hover:bg-stone-50 transition-colors text-sm"
-              >
-                关闭
-              </button>
-              <button 
-                onClick={onEdit} 
-                className="px-6 py-2.5 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-800 transition-all shadow-lg active:scale-95 text-sm flex items-center gap-2"
-              >
-                <Edit3 size={16} /> 编辑档案
-              </button>
-           </div>
         </div>
-      </div>
     </div>
   );
 };
