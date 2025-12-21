@@ -6,9 +6,10 @@ import StatsChart from './components/StatsChart';
 import ArtifactForm from './components/ArtifactForm';
 import ArtifactDetails from './components/ArtifactDetails';
 import LoginScreen from './components/LoginScreen';
-import { Artifact, User } from './types';
+import { Artifact, User } from '../types';
+import { api } from '../services/api';
 
-// Simple Logo Component (Trowel Icon)
+// Simple Logo Component
 const AppLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
     <path d="M12 22L5 9h14l-7 13zM12 9V5M10 2h4v3h-4V2z" />
@@ -63,6 +64,7 @@ const App: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
   
   // --- Profile Edit State ---
   const [previewAvatar, setPreviewAvatar] = useState('');
@@ -77,17 +79,19 @@ const App: React.FC = () => {
 
   // Initial load
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('archaeo_current_user');
-      if (savedUser) setUser(JSON.parse(savedUser));
-
-      const savedData = localStorage.getItem('artifacts');
-      if (savedData) {
-        setArtifacts(JSON.parse(savedData));
-      }
-    } catch (e) {
-      console.error("Failed to load initial data", e);
-    }
+    const init = async () => {
+        try {
+            const savedUser = localStorage.getItem('archaeo_current_user');
+            if (savedUser) {
+                setUser(JSON.parse(savedUser));
+                // Load artifacts from server if user is logged in
+                await loadArtifacts();
+            }
+        } catch (e) {
+            console.error("Failed to load initial data", e);
+        }
+    };
+    init();
   }, []);
 
   // Update preview when opening profile
@@ -97,9 +101,23 @@ const App: React.FC = () => {
     }
   }, [showProfile, user]);
 
-  const handleLogin = (userData: User) => {
+  const loadArtifacts = async () => {
+      try {
+          const data = await api.getArtifacts();
+          setArtifacts(data);
+          localStorage.setItem('artifacts', JSON.stringify(data)); // Cache local
+      } catch (err) {
+          console.error("Failed to fetch artifacts", err);
+          // Fallback to local
+          const savedData = localStorage.getItem('artifacts');
+          if (savedData) setArtifacts(JSON.parse(savedData));
+      }
+  }
+
+  const handleLogin = async (userData: User) => {
     setUser(userData);
     localStorage.setItem('archaeo_current_user', JSON.stringify(userData));
+    await loadArtifacts();
   };
 
   const handleLogout = () => {
@@ -119,47 +137,41 @@ const App: React.FC = () => {
       }
   };
 
-  const handleUpdateProfile = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
     const formData = new FormData(e.currentTarget);
     const displayName = formData.get('displayName') as string;
     const newPassword = formData.get('newPassword') as string;
 
-    const updatedUser = { ...user, displayName, avatarUrl: previewAvatar };
-    if (newPassword) updatedUser.password = newPassword;
+    const updatedData: any = { username: user.username, displayName, avatarUrl: previewAvatar };
+    if (newPassword) updatedData.newPassword = newPassword;
 
-    // Update in list of all users
     try {
-        const storedUsers = localStorage.getItem('archaeo_users');
-        if (storedUsers) {
-            const users: User[] = JSON.parse(storedUsers);
-            const index = users.findIndex(u => u.username === user.username);
-            if (index !== -1) {
-                users[index] = updatedUser;
-                localStorage.setItem('archaeo_users', JSON.stringify(users));
-            }
-        }
-    } catch(err) { console.error("Update failed", err)}
-
-    setUser(updatedUser);
-    localStorage.setItem('archaeo_current_user', JSON.stringify(updatedUser));
-    setShowProfile(false);
-    alert('个人信息已更新');
+        const updatedUser = await api.updateProfile(updatedData);
+        setUser(updatedUser);
+        localStorage.setItem('archaeo_current_user', JSON.stringify(updatedUser));
+        setShowProfile(false);
+        alert('个人信息已更新');
+    } catch(err) {
+        console.error("Update failed", err);
+        alert("更新失败");
+    }
   };
 
-  const saveArtifacts = (newArtifacts: Artifact[]) => {
-    setArtifacts(newArtifacts);
-    localStorage.setItem('artifacts', JSON.stringify(newArtifacts));
-  };
-
-  const handleSave = (data: Omit<Artifact, 'id' | 'createdAt'>) => {
+  const handleSave = async (data: Omit<Artifact, 'id' | 'createdAt'>) => {
     if (isEditing && selectedId) {
       const currentArtifact = artifacts.find(a => a.id === selectedId);
       if (currentArtifact) {
-        const updated = artifacts.map(a => a.id === selectedId ? { ...data, id: selectedId, createdAt: currentArtifact.createdAt } : a);
-        saveArtifacts(updated);
-        setIsEditing(false);
+        const updatedArtifact = { ...data, id: selectedId, createdAt: currentArtifact.createdAt } as Artifact;
+        try {
+            await api.saveArtifact(updatedArtifact);
+            setArtifacts(prev => prev.map(a => a.id === selectedId ? updatedArtifact : a));
+            setIsEditing(false);
+            setShowForm(false);
+        } catch (err) {
+            alert("保存失败");
+        }
       }
     } else {
       const newArtifact: Artifact = {
@@ -167,18 +179,28 @@ const App: React.FC = () => {
         id: Date.now().toString(),
         createdAt: Date.now()
       };
-      saveArtifacts([newArtifact, ...artifacts]);
-      setSelectedId(null); 
+      try {
+          await api.saveArtifact(newArtifact);
+          setArtifacts(prev => [newArtifact, ...prev]);
+          setShowForm(false);
+          setSelectedId(null); 
+      } catch(err) {
+          alert("保存失败");
+      }
     }
-    setShowForm(false);
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation(); 
     e.preventDefault();
     if (window.confirm('确定要删除这条记录吗？此操作不可恢复。')) {
-      saveArtifacts(artifacts.filter(a => a.id !== id));
-      if (selectedId === id) setSelectedId(null);
+      try {
+          await api.deleteArtifact(id);
+          setArtifacts(prev => prev.filter(a => a.id !== id));
+          if (selectedId === id) setSelectedId(null);
+      } catch (err) {
+          alert("删除失败");
+      }
     }
   };
 
@@ -196,7 +218,8 @@ const App: React.FC = () => {
        '保存状况': item.condition,
        '尺寸': item.dimensions,
        '出土日期': item.excavationDate,
-       '描述': item.description,
+       '备注': item.remarks,
+       '详细描述': item.description,
        '发现者': item.finder,
        '录入者': item.recorder,
      }));
@@ -214,7 +237,7 @@ const App: React.FC = () => {
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
           try {
               const data = new Uint8Array(event.target?.result as ArrayBuffer);
               const workbook = XLSX.read(data, { type: 'array' });
@@ -236,16 +259,22 @@ const App: React.FC = () => {
                  condition: row['保存状况'],
                  dimensions: row['尺寸'],
                  excavationDate: row['出土日期'],
-                 description: row['描述'],
+                 remarks: row['备注'],
+                 description: row['详细描述'] || row['描述'], // Fallback
                  finder: row['发现者'],
                  recorder: row['录入者'],
-                 images: [], // Images usually cannot be imported from simple Excel rows easily
+                 images: [], 
                  imageUrl: '' 
               }));
 
               if (newArtifacts.length > 0) {
                  if (window.confirm(`解析成功，准备导入 ${newArtifacts.length} 条数据。是否继续？`)) {
-                     saveArtifacts([...newArtifacts, ...artifacts]);
+                     setLoading(true);
+                     for (const art of newArtifacts) {
+                         await api.saveArtifact(art);
+                     }
+                     await loadArtifacts();
+                     setLoading(false);
                      alert("导入完成");
                  }
               } else {
@@ -254,6 +283,7 @@ const App: React.FC = () => {
           } catch (err) {
               console.error(err);
               alert("Excel 解析失败，请检查文件格式");
+              setLoading(false);
           }
       };
       reader.readAsArrayBuffer(file);
@@ -268,18 +298,23 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
         if (Array.isArray(json)) {
            if(window.confirm(`发现 ${json.length} 条记录。确定要覆盖当前数据吗？`)) {
-             saveArtifacts(json);
+             setLoading(true);
+             for (const art of json) {
+                 await api.saveArtifact(art);
+             }
+             await loadArtifacts();
+             setLoading(false);
              alert('数据导入成功！');
            }
         } else {
           alert('文件格式错误');
         }
-      } catch (err) { alert('文件解析失败'); }
+      } catch (err) { alert('文件解析失败'); setLoading(false); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -354,18 +389,18 @@ const App: React.FC = () => {
                <div className="flex items-center gap-2">
                   {/* Excel Import/Export */}
                   <div className="flex bg-stone-800 rounded-lg p-1 border border-stone-700">
-                      <button onClick={handleImportExcelTrigger} className="px-3 py-1 rounded hover:bg-stone-700 text-white transition-colors text-xs font-bold flex items-center gap-1.5" title="导入Excel">
+                      <button onClick={handleImportExcelTrigger} disabled={loading} className="px-3 py-1 rounded hover:bg-stone-700 text-white transition-colors text-xs font-bold flex items-center gap-1.5" title="导入Excel">
                          <FileSpreadsheet size={14} /> 导入
                       </button>
                       <input type="file" ref={excelInputRef} onChange={handleImportExcel} className="hidden" accept=".xlsx, .xls" />
                       <div className="w-px bg-stone-700 my-1"></div>
-                      <button onClick={handleExportExcel} className="px-3 py-1 rounded hover:bg-stone-700 text-white transition-colors text-xs font-bold flex items-center gap-1.5" title="导出Excel">
+                      <button onClick={handleExportExcel} disabled={loading} className="px-3 py-1 rounded hover:bg-stone-700 text-white transition-colors text-xs font-bold flex items-center gap-1.5" title="导出Excel">
                          <Download size={14} /> 导出
                       </button>
                   </div>
                   
-                  {/* JSON Backup (Hidden more deeply or separate) */}
-                  <button onClick={handleImportJSONTrigger} className="p-2 text-stone-400 hover:text-white transition-colors" title="恢复备份 (JSON)">
+                  {/* JSON Backup */}
+                  <button onClick={handleImportJSONTrigger} disabled={loading} className="p-2 text-stone-400 hover:text-white transition-colors" title="恢复备份 (JSON)">
                      <Upload size={14} />
                   </button>
                   <input type="file" ref={fileInputRef} onChange={handleImportJSON} className="hidden" accept=".json" />
@@ -425,120 +460,126 @@ const App: React.FC = () => {
                     </div>
                  )}
 
-                 {/* MODE A: Dashboard (Site Cards) */}
-                 {!selectedSiteFilter && !searchTerm ? (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {siteGroups.map(site => (
-                            <div 
-                                key={site.name}
-                                onClick={() => setSelectedSiteFilter(site.name)}
-                                className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md hover:border-terra-200 transition-all cursor-pointer group flex items-center gap-4"
-                            >
-                                <div className="w-20 h-20 rounded-xl bg-stone-100 shrink-0 overflow-hidden border border-stone-100 group-hover:border-terra-100 transition-colors">
-                                    {site.image ? (
-                                        <img src={site.image} className="w-full h-full object-cover" alt="" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-stone-300">
-                                            <Folder size={32} />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-serif font-bold text-stone-800 mb-1 truncate group-hover:text-terra-700 transition-colors">{site.name}</h3>
-                                    <div className="text-xs text-stone-400 mb-2">上次更新: {site.formattedDate}</div>
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-stone-100 text-stone-600 text-xs font-bold gap-1 group-hover:bg-terra-50 group-hover:text-terra-700 transition-colors">
-                                        <Layers size={12} /> {site.count} 件
-                                    </span>
-                                </div>
-                                <div className="pr-2 text-stone-300 group-hover:translate-x-1 transition-transform group-hover:text-terra-400">
-                                    <ChevronRight size={20} />
-                                </div>
-                            </div>
-                        ))}
-                        {siteGroups.length === 0 && (
-                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-stone-400 bg-white rounded-2xl border border-dashed border-stone-200">
-                                <Box size={40} className="mb-4 opacity-20" />
-                                <p>暂无记录，请点击右上角新增登记</p>
-                            </div>
-                        )}
+                 {loading ? (
+                     <div className="py-20 flex justify-center text-stone-400 gap-2">
+                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-terra-500"></div> 加载中...
                      </div>
                  ) : (
-                     /* MODE B: Artifact List */
-                     <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden min-h-[500px]">
-                        <table className="w-full text-left text-sm">
-                          <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 font-medium">
-                            <tr>
-                              <th className="px-4 py-3 pl-6">文物信息</th>
-                              <th className="px-4 py-3">遗址/单位</th>
-                              <th className="px-4 py-3">质地/器类</th>
-                              <th className="px-4 py-3 text-right pr-6">操作</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-stone-100">
-                            {filteredArtifacts.map(item => (
-                              <tr key={item.id} className="hover:bg-stone-50/50 group transition-colors">
-                                <td className="px-4 py-3 pl-6">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-lg bg-stone-100 overflow-hidden shrink-0 border border-stone-200 cursor-pointer" onClick={() => setSelectedId(item.id)}>
-                                      {item.imageUrl ? (
-                                        <img src={item.imageUrl} className="w-full h-full object-cover" alt="" />
-                                      ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-stone-300">
-                                          <Box size={16} />
-                                        </div>
-                                      )}
+                     /* MODE A: Dashboard (Site Cards) */
+                     !selectedSiteFilter && !searchTerm ? (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {siteGroups.map(site => (
+                                <div 
+                                    key={site.name}
+                                    onClick={() => setSelectedSiteFilter(site.name)}
+                                    className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md hover:border-terra-200 transition-all cursor-pointer group flex items-center gap-4"
+                                >
+                                    <div className="w-20 h-20 rounded-xl bg-stone-100 shrink-0 overflow-hidden border border-stone-100 group-hover:border-terra-100 transition-colors">
+                                        {site.image ? (
+                                            <img src={site.image} className="w-full h-full object-cover" alt="" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-stone-300">
+                                                <Folder size={32} />
+                                            </div>
+                                        )}
                                     </div>
-                                    <div>
-                                      <div className="font-bold text-stone-800 font-serif cursor-pointer hover:text-terra-600" onClick={() => setSelectedId(item.id)}>{item.name}</div>
-                                      <div className="text-xs text-stone-400 font-mono">{item.serialNumber || '无编号'}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-serif font-bold text-stone-800 mb-1 truncate group-hover:text-terra-700 transition-colors">{site.name}</h3>
+                                        <div className="text-xs text-stone-400 mb-2">上次更新: {site.formattedDate}</div>
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-stone-100 text-stone-600 text-xs font-bold gap-1 group-hover:bg-terra-50 group-hover:text-terra-700 transition-colors">
+                                            <Layers size={12} /> {site.count} 件
+                                        </span>
                                     </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-stone-600">
-                                  <div className="font-medium">{item.siteName}</div>
-                                  <div className="text-xs text-stone-400">{item.unit}</div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-600">
-                                    {item.material} · {item.category}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-right pr-6">
-                                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button 
-                                      onClick={() => setSelectedId(item.id)}
-                                      className="p-1.5 text-stone-400 hover:text-terra-600 hover:bg-terra-50 rounded transition-colors"
-                                      title="查看详情"
-                                    >
-                                      <Database size={16} />
-                                    </button>
-                                    <button 
-                                      onClick={() => { setIsEditing(true); setSelectedId(item.id); setShowForm(true); }}
-                                      className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded transition-colors"
-                                      title="编辑"
-                                    >
-                                      <Edit2 size={16} />
-                                    </button>
-                                    <button 
-                                      onClick={(e) => handleDelete(e, item.id)}
-                                      className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                      title="删除"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
+                                    <div className="pr-2 text-stone-300 group-hover:translate-x-1 transition-transform group-hover:text-terra-400">
+                                        <ChevronRight size={20} />
+                                    </div>
+                                </div>
                             ))}
-                          </tbody>
-                        </table>
-                        {filteredArtifacts.length === 0 && (
-                            <div className="py-20 text-center text-stone-400 flex flex-col items-center">
-                                <Box size={40} className="mb-2 opacity-20" />
-                                暂无匹配数据
-                            </div>
-                        )}
-                     </div>
+                            {siteGroups.length === 0 && (
+                                <div className="col-span-full py-12 flex flex-col items-center justify-center text-stone-400 bg-white rounded-2xl border border-dashed border-stone-200">
+                                    <Box size={40} className="mb-4 opacity-20" />
+                                    <p>暂无记录，请点击右上角新增登记</p>
+                                </div>
+                            )}
+                         </div>
+                     ) : (
+                         /* MODE B: Artifact List */
+                         <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden min-h-[500px]">
+                            <table className="w-full text-left text-sm">
+                              <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 font-medium">
+                                <tr>
+                                  <th className="px-4 py-3 pl-6">文物信息</th>
+                                  <th className="px-4 py-3">遗址/单位</th>
+                                  <th className="px-4 py-3">质地/器类</th>
+                                  <th className="px-4 py-3 text-right pr-6">操作</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-stone-100">
+                                {filteredArtifacts.map(item => (
+                                  <tr key={item.id} className="hover:bg-stone-50/50 group transition-colors">
+                                    <td className="px-4 py-3 pl-6">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-lg bg-stone-100 overflow-hidden shrink-0 border border-stone-200 cursor-pointer" onClick={() => setSelectedId(item.id)}>
+                                          {item.imageUrl ? (
+                                            <img src={item.imageUrl} className="w-full h-full object-cover" alt="" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-stone-300">
+                                              <Box size={16} />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div className="font-bold text-stone-800 font-serif cursor-pointer hover:text-terra-600" onClick={() => setSelectedId(item.id)}>{item.name}</div>
+                                          <div className="text-xs text-stone-400 font-mono">{item.serialNumber || '无编号'}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-stone-600">
+                                      <div className="font-medium">{item.siteName}</div>
+                                      <div className="text-xs text-stone-400">{item.unit}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-600">
+                                        {item.material} · {item.category}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right pr-6">
+                                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                          onClick={() => setSelectedId(item.id)}
+                                          className="p-1.5 text-stone-400 hover:text-terra-600 hover:bg-terra-50 rounded transition-colors"
+                                          title="查看详情"
+                                        >
+                                          <Database size={16} />
+                                        </button>
+                                        <button 
+                                          onClick={() => { setIsEditing(true); setSelectedId(item.id); setShowForm(true); }}
+                                          className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded transition-colors"
+                                          title="编辑"
+                                        >
+                                          <Edit2 size={16} />
+                                        </button>
+                                        <button 
+                                          onClick={(e) => handleDelete(e, item.id)}
+                                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          title="删除"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {filteredArtifacts.length === 0 && (
+                                <div className="py-20 text-center text-stone-400 flex flex-col items-center">
+                                    <Box size={40} className="mb-2 opacity-20" />
+                                    暂无匹配数据
+                                </div>
+                            )}
+                         </div>
+                     )
                  )}
               </div>
 
@@ -661,6 +702,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
              <ArtifactForm 
                 initialData={isEditing && selectedId ? selectedArtifact : null}
+                existingArtifacts={artifacts}
                 onSave={handleSave}
                 onCancel={() => setShowForm(false)}
              />

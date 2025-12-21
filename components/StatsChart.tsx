@@ -2,14 +2,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Artifact } from '../types';
-import { PieChart, BarChart2, Grid, Box, Shapes } from 'lucide-react';
+import { PieChart, BarChart2, Grid, Box, Shapes, Tag } from 'lucide-react';
 
 interface StatsChartProps {
   artifacts: Artifact[];
 }
 
-// Restricted to user request: Material (质地), Category (器类), Unit (出土单位)
-type Tab = 'material' | 'category' | 'unit';
+// Added 'name' to Tab type
+type Tab = 'material' | 'category' | 'unit' | 'name';
 
 const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
   const chartRef = useRef<SVGSVGElement>(null);
@@ -39,9 +39,13 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
         colorHex = "#92400e"; // Terra-600
         break;
       case 'unit':
-        // Unit often combined with Site Name for uniqueness, but here we just show 'Unit' string density
         dataMap = d3.rollup(artifacts, v => v.length, d => d.unit || '未知单位');
         colorHex = "#57534e"; // Stone-600
+        break;
+      case 'name':
+        // New Case for Name Analysis
+        dataMap = d3.rollup(artifacts, v => v.length, d => d.name || '未命名');
+        colorHex = "#44403c"; // Stone-700
         break;
       default:
         return;
@@ -58,8 +62,6 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
     }
 
     // --- Render Logic (Shared Bar Chart for consistency) ---
-    // If it's Material, user might expect Pie, but Bar is clearer for comparisons.
-    // Let's use Bar for all for clean UI.
 
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
@@ -130,7 +132,8 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
   const tabs: {id: Tab, icon: React.FC<any>, label: string}[] = [
       { id: 'material', icon: Box, label: '质地' },
       { id: 'category', icon: Shapes, label: '器类' },
-      { id: 'unit', icon: Grid, label: '出土单位' },
+      { id: 'name', icon: Tag, label: '名称' },
+      { id: 'unit', icon: Grid, label: '单位' },
   ];
 
   return (
@@ -155,9 +158,10 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
            <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
             <svg ref={chartRef}></svg>
             <p className="text-xs text-stone-400 mt-2">
-                {activeTab === 'material' && '按材质统计'}
-                {activeTab === 'category' && '按器物类别统计'}
-                {activeTab === 'unit' && '按出土单位统计'}
+                {activeTab === 'material' && '按材质统计 (Top 8)'}
+                {activeTab === 'category' && '按器物类别统计 (Top 8)'}
+                {activeTab === 'name' && '按器物名称统计 (Top 8)'}
+                {activeTab === 'unit' && '按出土单位统计 (Top 8)'}
             </p>
           </div>
         )}

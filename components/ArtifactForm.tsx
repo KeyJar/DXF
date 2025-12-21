@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { Artifact, ArtifactCondition, ArtifactImage, ImageType, PhotoView } from '../types';
 import { analyzeArtifactPhoto, analyzeArtifactDrawing } from '../services/geminiService';
-import { Loader2, Sparkles, X, MapPin, Tag, Hash, Layers, Activity, Box, PenTool, ChevronDown, Plus, Trash2, Shapes, Edit3, User, List, Camera, PenTool as PenToolIcon, ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, ChevronLeft, ChevronRight, Image as ImageIcon, ChevronUp, Calendar, Ruler, ScanLine } from 'lucide-react';
+import { Loader2, Sparkles, X, MapPin, Tag, Hash, Layers, Activity, Box, PenTool, ChevronDown, Plus, Trash2, Shapes, Edit3, User, List, Camera, PenTool as PenToolIcon, ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, ChevronLeft, ChevronRight, Image as ImageIcon, ChevronUp, Calendar, Ruler, ScanLine, Sticker, GripVertical } from 'lucide-react';
 
 interface ArtifactFormProps {
   initialData?: Artifact | null;
+  existingArtifacts?: Artifact[]; // Added to calculate frequency
   onSave: (artifact: Omit<Artifact, 'id' | 'createdAt'>) => void;
   onCancel: () => void;
 }
@@ -53,36 +54,55 @@ interface CustomSelectProps {
   value: string;
   onChange: (value: string) => void;
   storageKey: string;
+  recommendations?: string[]; // Frequency-based sorting
   placeholder?: string;
   icon?: React.ElementType;
   required?: boolean;
 }
 
-const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey, placeholder, icon: Icon, required }) => {
-  const [options, setOptions] = useState<string[]>([]);
+const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey, recommendations = [], placeholder, icon: Icon, required }) => {
+  const [localOptions, setLocalOptions] = useState<string[]>([]);
+  const [customOrder, setCustomOrder] = useState<string[]>([]); // Stores the user-defined order
   const [isOpen, setIsOpen] = useState(false);
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(`custom_opts_${storageKey}`);
-    if (saved) {
-      setOptions(JSON.parse(saved));
-    }
+    // 1. Load Local Storage options & Custom Order
+    const savedOpts = localStorage.getItem(`custom_opts_${storageKey}`);
+    const savedOrder = localStorage.getItem(`custom_order_${storageKey}`);
+    
+    if (savedOpts) setLocalOptions(JSON.parse(savedOpts));
+    if (savedOrder) setCustomOrder(JSON.parse(savedOrder));
   }, [storageKey]);
 
-  const saveOptions = (newOptions: string[]) => {
+  const saveLocalOptions = (newOptions: string[]) => {
     const uniqueOptions = Array.from(new Set(newOptions)).filter(Boolean);
-    setOptions(uniqueOptions);
+    setLocalOptions(uniqueOptions);
     localStorage.setItem(`custom_opts_${storageKey}`, JSON.stringify(uniqueOptions));
+  };
+
+  const saveCustomOrder = (newOrder: string[]) => {
+    const uniqueOrder = Array.from(new Set(newOrder)).filter(Boolean);
+    setCustomOrder(uniqueOrder);
+    localStorage.setItem(`custom_order_${storageKey}`, JSON.stringify(uniqueOrder));
   };
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (value && !options.includes(value)) {
-      const newOptions = [...options, value];
-      saveOptions(newOptions);
+    if (value && !localOptions.includes(value)) {
+      const newOptions = [value, ...localOptions];
+      saveLocalOptions(newOptions);
+      
+      // Auto-add to custom order at top? Or let it float?
+      // Let's add it to the top of custom order for immediate convenience
+      const newOrder = [value, ...customOrder];
+      saveCustomOrder(newOrder);
+      
       setIsOpen(false);
     }
   };
@@ -90,8 +110,35 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
   const handleDelete = (e: React.MouseEvent, opt: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const newOptions = options.filter(o => o !== opt);
-    saveOptions(newOptions);
+    const newOptions = localOptions.filter(o => o !== opt);
+    saveLocalOptions(newOptions);
+    
+    // Also remove from custom order
+    if (customOrder.includes(opt)) {
+         const newOrder = customOrder.filter(p => p !== opt);
+         saveCustomOrder(newOrder);
+    }
+  };
+
+  const handleSort = () => {
+    // Duplicate items logic is handled by Set in saveCustomOrder, but let's be careful with indices
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    
+    // We are reordering the *Display List*.
+    const _displayOptions = [...displayOptions];
+    const draggedItemContent = _displayOptions[dragItem.current];
+
+    // Remove from old index
+    _displayOptions.splice(dragItem.current, 1);
+    // Insert at new index
+    _displayOptions.splice(dragOverItem.current, 0, draggedItemContent);
+
+    // Save this new order as the Custom Order
+    // This effectively "captures" any recommended items into the custom order if they were moved
+    saveCustomOrder(_displayOptions);
+
+    dragItem.current = null;
+    dragOverItem.current = null;
   };
 
   useEffect(() => {
@@ -104,9 +151,28 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOptions = (value && options.includes(value))
-    ? options
-    : options.filter(o => o.toLowerCase().includes((value || "").toLowerCase()));
+  // --- Sorting Logic: Custom Order -> Frequency -> History ---
+  const displayOptions = useMemo(() => {
+      // 1. Custom Order (Manual Sort)
+      const ordered = [...customOrder];
+
+      // 2. Recommendations (Frequency) - exclude already ordered
+      const freq = recommendations.filter(r => !ordered.includes(r));
+      
+      // 3. Local History - exclude ordered & freq
+      const history = localOptions.filter(o => !ordered.includes(o) && !recommendations.includes(o));
+      
+      const all = [...ordered, ...freq, ...history];
+      
+      // 4. Filter by input value
+      if (!value || all.includes(value)) return all;
+      
+      // IMPORTANT: When filtering, the original order is preserved but subsets are shown.
+      // We disable drag-and-drop during filtering to avoid confusion.
+      return all.filter(o => o.toLowerCase().includes(value.toLowerCase()));
+  }, [customOrder, recommendations, localOptions, value]);
+
+  const isFiltering = !!value && !displayOptions.includes(value) && displayOptions.length !== (customOrder.length + recommendations.length + localOptions.length); // Rough check if filtering is active
 
   return (
     <div className="relative group w-full" ref={containerRef}>
@@ -138,36 +204,75 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-stone-200 rounded-lg shadow-xl max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 no-scrollbar ring-1 ring-black ring-opacity-5">
-           {value && !options.includes(value) && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-stone-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 no-scrollbar ring-1 ring-black ring-opacity-5">
+           {value && !localOptions.includes(value) && !recommendations.includes(value) && !customOrder.includes(value) && (
             <div 
               onClick={handleAdd}
-              className="px-3 py-2 text-xs text-terra-600 hover:bg-terra-50 cursor-pointer flex items-center gap-2 border-b border-stone-100 font-medium sticky top-0 bg-white"
+              className="px-3 py-2 text-xs text-terra-600 hover:bg-terra-50 cursor-pointer flex items-center gap-2 border-b border-stone-100 font-medium sticky top-0 bg-white z-10"
             >
               <Plus size={12} />
-              添加 "{value}" 为新选项
+              添加 "{value}" 到列表
             </div>
           )}
-          {filteredOptions.length === 0 && !value && (
+          {displayOptions.length === 0 && !value && (
             <div className="px-3 py-4 text-xs text-stone-400 text-center italic">
-              暂无历史记录，请输入并添加
+              暂无记录，请输入并添加
             </div>
           )}
-          {filteredOptions.map(opt => (
-            <div 
-              key={opt} 
-              className={`px-3 py-2 text-sm cursor-pointer flex justify-between items-center group/item transition-colors ${value === opt ? 'bg-terra-50 text-terra-700 font-medium' : 'text-stone-700 hover:bg-stone-50'}`}
-              onClick={() => {
-                onChange(opt);
-                setIsOpen(false);
-              }}
-            >
-              <span className="truncate">{opt}</span>
-              <button onClick={(e) => handleDelete(e, opt)} className="text-stone-300 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity p-1">
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
+          {displayOptions.map((opt, idx) => {
+             const isOrdered = customOrder.includes(opt);
+             const isRecommended = recommendations.includes(opt);
+             
+             return (
+                <div 
+                key={opt} 
+                className={`px-3 py-2 text-sm cursor-pointer flex justify-between items-center group/item transition-colors relative ${value === opt ? 'bg-terra-50 text-terra-700 font-medium' : 'text-stone-700 hover:bg-stone-50'}`}
+                draggable={!value} // Disable drag when filtering
+                onDragStart={(e) => {
+                    if (value) return;
+                    dragItem.current = idx;
+                    e.dataTransfer.effectAllowed = "move";
+                    // Minimal styling for the drag ghost if possible, or leave default
+                }}
+                onDragEnter={(e) => {
+                    if (value) return;
+                    dragOverItem.current = idx;
+                    // Could add visual reorder preview here if state allows
+                }}
+                onDragEnd={handleSort}
+                onDragOver={(e) => e.preventDefault()} // Necessary to allow dropping
+                onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                }}
+                >
+                <div className="flex items-center gap-2 truncate flex-1">
+                     {/* Drag Handle - Only show when not filtering */}
+                    {!value && (
+                        <div className="text-stone-300 cursor-grab hover:text-stone-500 active:cursor-grabbing">
+                            <GripVertical size={12} />
+                        </div>
+                    )}
+                    
+                    <span className="truncate">{opt}</span>
+                    
+                    {!isOrdered && isRecommended && idx < 5 && (
+                        <span className="text-[9px] bg-stone-100 text-stone-400 px-1 rounded shrink-0">热</span>
+                    )}
+                </div>
+                
+                <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                    <button 
+                        onClick={(e) => handleDelete(e, opt)} 
+                        className="p-1 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded"
+                        title="删除选项"
+                    >
+                        <Trash2 size={12} />
+                    </button>
+                </div>
+                </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -236,7 +341,7 @@ const FilmstripItem = memo(({
     return prev.isSelected === next.isSelected && prev.image?.id === next.image?.id;
 });
 
-const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialData }) => {
+const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialData, existingArtifacts = [] }) => {
   const [formData, setFormData] = useState<Partial<Artifact>>({
     quantity: 1,
     excavationDate: new Date().toISOString().split('T')[0],
@@ -246,9 +351,38 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     material: '',
     siteName: '',
     name: '',
+    remarks: '', // Init remarks
     images: [],
     ...initialData
   });
+
+  // Calculate most frequent options based on existing data
+  const sortedOptions = useMemo(() => {
+    const calculateFrequency = (key: keyof Artifact) => {
+        const map = new Map<string, number>();
+        existingArtifacts.forEach(a => {
+            const val = a[key];
+            if (typeof val === 'string' && val) {
+                map.set(val, (map.get(val) || 0) + 1);
+            }
+        });
+        // Sort by frequency (desc)
+        return Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(entry => entry[0]);
+    };
+
+    return {
+        sites: calculateFrequency('siteName'),
+        names: calculateFrequency('name'),
+        categories: calculateFrequency('category'),
+        materials: calculateFrequency('material'),
+        conditions: calculateFrequency('condition'),
+        finders: calculateFrequency('finder'),
+        recorders: calculateFrequency('recorder'),
+        remarks: calculateFrequency('remarks'), // Frequency for remarks
+    };
+  }, [existingArtifacts]);
 
   const [selectedPhotoView, setSelectedPhotoView] = useState<PhotoView>('正');
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
@@ -716,6 +850,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         value={formData.siteName || ''} 
                         onChange={handleValueUpdate('siteName')} 
                         storageKey="siteName"
+                        recommendations={sortedOptions.sites}
                         placeholder="请输入并添加遗址"
                         icon={MapPin}
                         required
@@ -790,6 +925,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         value={formData.name || ''} 
                         onChange={handleValueUpdate('name')} 
                         storageKey="artifactName"
+                        recommendations={sortedOptions.names}
                         placeholder="器名" 
                         icon={Tag}
                         required
@@ -801,6 +937,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         value={formData.category || ''} 
                         onChange={handleValueUpdate('category')} 
                         storageKey="category"
+                        recommendations={sortedOptions.categories}
                         placeholder="类别 (如: 陶器)"
                         icon={Shapes}
                     />
@@ -815,6 +952,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         value={formData.material || ''} 
                         onChange={handleValueUpdate('material')} 
                         storageKey="material"
+                        recommendations={sortedOptions.materials}
                         placeholder="质地"
                         icon={Box}
                     />
@@ -836,6 +974,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         value={formData.condition || ''} 
                         onChange={(val) => handleValueUpdate('condition')(val)}
                         storageKey="condition"
+                        recommendations={sortedOptions.conditions}
                         placeholder="状况"
                         icon={Activity}
                     />
@@ -885,25 +1024,39 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
              <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className={labelClass}>发现者</label>
-                    <CustomSelect value={formData.finder || ''} onChange={handleValueUpdate('finder')} storageKey="finder" placeholder="姓名" icon={User} />
+                    <CustomSelect value={formData.finder || ''} onChange={handleValueUpdate('finder')} storageKey="finder" recommendations={sortedOptions.finders} placeholder="姓名" icon={User} />
                  </div>
                  <div>
                     <label className={labelClass}>录入者</label>
-                    <CustomSelect value={formData.recorder || ''} onChange={handleValueUpdate('recorder')} storageKey="recorder" placeholder="姓名" icon={Edit3} />
+                    <CustomSelect value={formData.recorder || ''} onChange={handleValueUpdate('recorder')} storageKey="recorder" recommendations={sortedOptions.recorders} placeholder="姓名" icon={Edit3} />
                  </div>
              </div>
 
-             {/* Row 7: Description */}
-             <div>
-                <label className={labelClass}>描述</label>
-                <textarea 
-                    name="description" 
-                    value={formData.description || ''} 
-                    onChange={handleInputChange} 
-                    rows={4} 
-                    className="w-full px-3 py-3 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 outline-none resize-none bg-white text-stone-700 placeholder:text-stone-300"
-                    placeholder="记录文物的形态、纹饰、风格等详细信息..."
-                />
+             {/* Row 7: Remarks & Description */}
+             <div className="space-y-4">
+                <div>
+                   <label className={labelClass}>备注</label>
+                   <CustomSelect 
+                        value={formData.remarks || ''} 
+                        onChange={handleValueUpdate('remarks')} 
+                        storageKey="remarks" 
+                        recommendations={sortedOptions.remarks} 
+                        placeholder="例如: 采集, 征集, 旧藏, 展出..." 
+                        icon={Sticker} 
+                   />
+                </div>
+                
+                <div>
+                    <label className={labelClass}>详细记录</label>
+                    <textarea 
+                        name="description" 
+                        value={formData.description || ''} 
+                        onChange={handleInputChange} 
+                        rows={3} 
+                        className="w-full px-3 py-3 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 outline-none resize-none bg-white text-stone-700 placeholder:text-stone-300"
+                        placeholder="记录文物的形态、纹饰、风格等详细信息..."
+                    />
+                </div>
              </div>
         </div>
       </div>

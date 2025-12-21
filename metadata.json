@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Archaeology - 考古文物记录",
+  "name": "Archaeology - 考古出土器物数字档案",
   "description": "专业的考古出土文物数字化记录平台，集成AI辅助识别与数据可视化分析功能。",
   "requestFramePermissions": [
     "camera"

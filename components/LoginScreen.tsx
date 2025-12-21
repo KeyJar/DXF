@@ -83,7 +83,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <div className="relative z-10">
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 bg-terra-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-terra-600/30 rotate-3">
-               {/* Trowel Logo */}
+               {/* Pointed Trowel Logo */}
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-8 h-8">
                   <path d="M12 22L5 9h14l-7 13zM12 9V5M10 2h4v3h-4V2z" />
                </svg>

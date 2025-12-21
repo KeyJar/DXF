@@ -43,7 +43,9 @@ export interface Artifact {
   images: ArtifactImage[]; // NEW: Multiple images
   imageUrl?: string;     // Legacy/Thumbnail (Usually points to the first 'Front' photo)
   
-  description: string;   // 描述/备注
+  description: string;   // 描述/详细记录
+  remarks?: string;      // NEW: 备注 (Short tags like "采集", "旧藏", "展出")
+  
   aiAnalysis?: string;   // AI 分析结果
   finder?: string;       // 发现者
   recorder?: string;     // 录入者

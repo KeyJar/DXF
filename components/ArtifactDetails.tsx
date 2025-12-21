@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Artifact, ImageType } from '../types';
-import { X, Calendar, MapPin, Hash, Layers, Tag, Box, Activity, User, PenTool, Edit3, Image as ImageIcon, Camera, Maximize2, Ruler, Shapes, List } from 'lucide-react';
+import { X, Calendar, MapPin, Hash, Layers, Tag, Box, Activity, User, PenTool, Edit3, Image as ImageIcon, Camera, Maximize2, Ruler, Shapes, List, Sticker } from 'lucide-react';
 
 interface ArtifactDetailsProps {
   artifact: Artifact;
@@ -135,16 +135,17 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
                  <InfoItem icon={Box} label="质地" value={artifact.material} />
                  <InfoItem icon={List} label="数量" value={artifact.quantity} />
                  <InfoItem icon={Activity} label="保存状况" value={artifact.condition} />
+                 <InfoItem icon={Sticker} label="备注" value={artifact.remarks} />
                  <InfoItem icon={Ruler} label="测量尺寸" value={artifact.dimensions} fullWidth />
               </div>
 
               {/* Description Box */}
               <div className="bg-stone-50 p-5 rounded-xl border border-stone-100">
                 <div className="flex items-center gap-2 text-stone-500 mb-2 font-bold text-xs uppercase tracking-wider">
-                  <PenTool size={14} /> 描述记录
+                  <PenTool size={14} /> 详细记录
                 </div>
                 <p className="text-stone-700 leading-relaxed font-serif text-sm whitespace-pre-line">
-                  {artifact.description || "暂无详细描述..."}
+                  {artifact.description || "暂无详细记录..."}
                 </p>
               </div>
               
