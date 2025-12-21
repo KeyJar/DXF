@@ -1049,7 +1049,19 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 <p className="text-[10px] text-stone-400 italic mt-1 ml-1">* 请输入数字，系统将自动格式化。AI 测算结果仅供参考。</p>
              </div>
 
-             {/* Row 7: Description */}
+             {/* Row 7: Personnel (Finder/Recorder) - MOVED HERE */}
+             <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className={labelClass}>发现者</label>
+                    <CustomSelect value={formData.finder || ''} onChange={handleValueUpdate('finder')} storageKey="finder" recommendations={sortedOptions.finders} placeholder="姓名" icon={User} />
+                 </div>
+                 <div>
+                    <label className={labelClass}>录入者</label>
+                    <CustomSelect value={formData.recorder || ''} onChange={handleValueUpdate('recorder')} storageKey="recorder" recommendations={sortedOptions.recorders} placeholder="姓名" icon={Edit3} />
+                 </div>
+             </div>
+
+             {/* Row 8: Description */}
              <div>
                 <label className={labelClass}>器物描述</label>
                 <textarea 
@@ -1062,7 +1074,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 />
              </div>
              
-             {/* Row 8: Remarks */}
+             {/* Row 9: Remarks */}
              <div>
                 <label className={labelClass}>备注</label>
                 <div className="relative group w-full">
@@ -1078,17 +1090,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 </div>
              </div>
 
-             {/* Row 9: Personnel */}
-             <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className={labelClass}>发现者</label>
-                    <CustomSelect value={formData.finder || ''} onChange={handleValueUpdate('finder')} storageKey="finder" recommendations={sortedOptions.finders} placeholder="姓名" icon={User} />
-                 </div>
-                 <div>
-                    <label className={labelClass}>录入者</label>
-                    <CustomSelect value={formData.recorder || ''} onChange={handleValueUpdate('recorder')} storageKey="recorder" recommendations={sortedOptions.recorders} placeholder="姓名" icon={Edit3} />
-                 </div>
-             </div>
         </div>
       </div>
       
