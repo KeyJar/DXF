@@ -140,9 +140,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <div className="relative z-10">
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 bg-terra-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-terra-600/30 rotate-3">
-               {/* Pointed Trowel Logo */}
-               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-8 h-8">
-                  <path d="M12 22L5 9h14l-7 13zM12 9V5M10 2h4v3h-4V2z" />
+               {/* Sharper Tip, Smooth Handle, Tilted 45 Degrees */}
+               <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
+                  <g transform="rotate(45 12 12)">
+                      <path d="M12 24L7.5 13H11V11H10.5V2.5C10.5 1.67 11.17 1 12 1C12.83 1 13.5 1.67 13.5 2.5V11H13V13H16.5L12 24Z" />
+                  </g>
                </svg>
             </div>
             <h1 className="text-3xl font-serif font-bold text-stone-800">Archaeology</h1>

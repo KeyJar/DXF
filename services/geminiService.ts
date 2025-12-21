@@ -4,22 +4,101 @@ import { GoogleGenAI, Type } from "@google/genai";
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API Key not found");
+    throw new Error("API Key not found (process.env.API_KEY)");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 const cleanBase64 = (base64Image: string) => base64Image.split(',')[1] || base64Image;
 
+// --- DeepSeek / OpenAI Compatible Helper ---
+const callDeepSeekAPI = async (modelId: string, systemPrompt: string, base64Image: string, jsonSchema: any) => {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+        throw new Error("未配置 DeepSeek API Key (process.env.DEEPSEEK_API_KEY)");
+    }
+
+    const messages = [
+        { role: "system", content: systemPrompt },
+        {
+            role: "user",
+            content: [
+                { type: "text", text: "请分析这张图片，并按 JSON 格式输出结果。" },
+                {
+                    type: "image_url",
+                    image_url: {
+                        url: `data:image/jpeg;base64,${cleanBase64(base64Image)}`
+                    }
+                }
+            ]
+        }
+    ];
+
+    try {
+        const response = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: modelId,
+                messages: messages,
+                response_format: { type: "json_object" }, // DeepSeek supports JSON mode
+                temperature: 1.0
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            // Handle common DeepSeek/OpenAI vision limitation errors
+            if (err?.error?.message?.includes("vision") || err?.error?.message?.includes("image")) {
+                throw new Error("该 DeepSeek 模型暂时不支持图片输入，请使用 Gemini 模型。");
+            }
+            throw new Error(`DeepSeek API Error: ${err?.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        
+        if (!content) return null;
+        
+        // Ensure we parse valid JSON (sometimes models add markdown backticks)
+        const jsonString = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(jsonString);
+
+    } catch (error) {
+        console.error("DeepSeek Call Failed:", error);
+        throw error;
+    }
+};
+
 /**
- * Analyzes an artifact PHOTO to suggest metadata (Name, Material, Description).
+ * Analyzes an artifact PHOTO to suggest metadata.
+ * Routes to DeepSeek or Gemini based on modelId.
  */
-export const analyzeArtifactPhoto = async (base64Image: string): Promise<any> => {
+export const analyzeArtifactPhoto = async (base64Image: string, modelId: string = "gemini-3-flash-preview"): Promise<any> => {
+  // Route to DeepSeek if selected
+  if (modelId.startsWith('deepseek')) {
+      return callDeepSeekAPI(
+          modelId,
+          `你是一位专业的考古学家。请分析用户提供的文物照片，并返回一个合法的 JSON 对象。
+           必须严格包含以下字段：
+           - name: 器物名称
+           - material: 质地
+           - description: 简短专业描述 (100字以内)
+           不需要推测尺寸。请确保输出为纯 JSON。`,
+          base64Image,
+          null
+      );
+  }
+
+  // Default: Gemini Logic
   try {
     const ai = getAiClient();
     
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: modelId,
       contents: {
         parts: [
           {
@@ -64,14 +143,27 @@ export const analyzeArtifactPhoto = async (base64Image: string): Promise<any> =>
 };
 
 /**
- * Analyzes an artifact LINE DRAWING (Wireframe) to estimate dimensions based on scale bars.
+ * Analyzes an artifact LINE DRAWING (Wireframe).
  */
-export const analyzeArtifactDrawing = async (base64Image: string): Promise<any> => {
+export const analyzeArtifactDrawing = async (base64Image: string, modelId: string = "gemini-3-flash-preview"): Promise<any> => {
+  // Route to DeepSeek if selected
+  if (modelId.startsWith('deepseek')) {
+      return callDeepSeekAPI(
+          modelId,
+          `你是一位专业的考古学家。分析考古器物线图（Drawing）及比例尺。
+           请返回 JSON 对象，包含：
+           - dimensions: 格式化的尺寸字符串 (例如: "通高: 20cm")。
+           如果无法判断，dimensions 返回空字符串。`,
+          base64Image,
+          null
+      );
+  }
+
   try {
     const ai = getAiClient();
     
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Flash is usually sufficient for OCR/Scale reading
+      model: modelId, 
       contents: {
         parts: [
           {

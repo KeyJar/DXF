@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Artifact, ImageType } from '../types';
-import { X, Calendar, MapPin, Hash, Layers, Tag, Box, Activity, User, PenTool, Edit3, Image as ImageIcon, Camera, Maximize2, Ruler, Shapes, List, Sticker } from 'lucide-react';
+import { X, Calendar, MapPin, Hash, Layers, Tag, Box, Activity, User, PenTool, Edit3, Image as ImageIcon, Camera, Maximize2, Ruler, Shapes, List, Sticker, Compass, MoveVertical } from 'lucide-react';
 
 interface ArtifactDetailsProps {
   artifact: Artifact;
@@ -127,11 +127,18 @@ const ArtifactDetails: React.FC<ArtifactDetailsProps> = ({ artifact, onClose, on
                  <InfoItem icon={Calendar} label="出土日期" value={artifact.excavationDate} />
               </div>
 
+              {/* Coordinates Section */}
+              <div className="grid grid-cols-3 gap-4 p-3 bg-stone-50 rounded-lg border border-stone-100">
+                 <InfoItem icon={Compass} label="北坐标 (N)" value={artifact.coordinateN} />
+                 <InfoItem icon={Compass} label="东坐标 (E)" value={artifact.coordinateE} />
+                 <InfoItem icon={MoveVertical} label="高程 (Z)" value={artifact.coordinateZ} />
+              </div>
+
               <hr className="border-stone-100" />
 
               {/* Physical Attributes */}
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                 <InfoItem icon={Shapes} label="器类" value={artifact.category} />
+                 {/* Removed Category display */}
                  <InfoItem icon={Box} label="质地" value={artifact.material} />
                  <InfoItem icon={List} label="数量" value={artifact.quantity} />
                  <InfoItem icon={Activity} label="保存状况" value={artifact.condition} />

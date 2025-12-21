@@ -32,8 +32,13 @@ export interface Artifact {
   unit?: string;         // 单位/探方 (e.g., T101)
   layer?: string;        // 层位 (e.g., ③层)
   serialNumber?: string; // 编号 (e.g., H1:23)
+  
+  coordinateN?: string;  // 北坐标
+  coordinateE?: string;  // 东坐标
+  coordinateZ?: string;  // 高程
+
   name: string;          // 器物名称
-  category?: string;     // 器类 (e.g., 陶器, 铜器)
+  category?: string;     // 器类 (Deprecated in UI, kept for data compatibility)
   material: string;      // 质地
   quantity: number;      // 数量
   condition: ArtifactCondition | string; // 保存状况

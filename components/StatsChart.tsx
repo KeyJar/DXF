@@ -2,14 +2,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Artifact } from '../types';
-import { PieChart, BarChart2, Grid, Box, Shapes, Tag, Maximize2, X } from 'lucide-react';
+import { PieChart, BarChart2, Grid, Box, Shapes, Tag, Maximize2, X, Map as MapIcon } from 'lucide-react';
 
 interface StatsChartProps {
   artifacts: Artifact[];
 }
 
-// Added 'name' to Tab type
-type Tab = 'material' | 'category' | 'unit' | 'name';
+// Removed 'category', kept 'name' but we will label it as 'Category' (器类)
+type Tab = 'material' | 'unit' | 'name' | 'map';
 
 const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
   const chartRef = useRef<SVGSVGElement>(null);
@@ -29,6 +29,130 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
+    
+    // --- MAP VIEW (Scatter Plot for Coordinates) ---
+    if (activeTab === 'map') {
+        const parseCoord = (val: string | undefined) => {
+            if (!val) return null;
+            const num = parseFloat(String(val).replace(/[^\d.-]/g, ''));
+            return isNaN(num) ? null : num;
+        };
+
+        const mapData = artifacts
+            .map(a => ({
+                id: a.id,
+                name: a.name,
+                n: parseCoord(a.coordinateN),
+                e: parseCoord(a.coordinateE),
+                z: parseCoord(a.coordinateZ),
+                unit: a.unit,
+                site: a.siteName
+            }))
+            .filter(d => d.n !== null && d.e !== null) as { id: string, name: string, n: number, e: number, z: number | null, unit: string, site: string }[];
+
+        if (mapData.length === 0) {
+            svg.attr("width", width).attr("height", height)
+               .append("text")
+               .attr("x", width / 2)
+               .attr("y", height / 2)
+               .attr("text-anchor", "middle")
+               .style("fill", "#a8a29e")
+               .style("font-size", "12px")
+               .text("暂无有效坐标数据 (N, E)");
+            return;
+        }
+
+        const innerWidth = width - margin.left - margin.right;
+        const innerHeight = height - margin.top - margin.bottom;
+
+        const g = svg.attr("width", width).attr("height", height).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Scales (X = East, Y = North)
+        // Usually Surveying coords: N is Y axis (Up), E is X axis (Right)
+        const extentE = d3.extent(mapData, d => d.e) as [number, number];
+        const extentN = d3.extent(mapData, d => d.n) as [number, number];
+        
+        // Add some padding to the domain
+        const padE = (extentE[1] - extentE[0]) * 0.1 || 10;
+        const padN = (extentN[1] - extentN[0]) * 0.1 || 10;
+
+        const x = d3.scaleLinear()
+            .domain([extentE[0] - padE, extentE[1] + padE])
+            .range([0, innerWidth]);
+
+        const y = d3.scaleLinear()
+            .domain([extentN[0] - padN, extentN[1] + padN])
+            .range([innerHeight, 0]); // SVG Y is down, so invert range for N to be Up
+
+        // Color scale by Name (Category)
+        const colorScale = d3.scaleOrdinal(d3.schemeTableau10);
+
+        // Grid lines
+        g.append("g")
+            .attr("class", "grid")
+            .attr("transform", `translate(0,${innerHeight})`)
+            .call(d3.axisBottom(x).ticks(5).tickSize(-innerHeight).tickFormat(() => ""))
+            .style("stroke-dasharray", ("3,3"))
+            .style("stroke-opacity", 0.1);
+
+        g.append("g")
+            .attr("class", "grid")
+            .call(d3.axisLeft(y).ticks(5).tickSize(-innerWidth).tickFormat(() => ""))
+            .style("stroke-dasharray", ("3,3"))
+            .style("stroke-opacity", 0.1);
+
+        // Axis
+        g.append("g")
+            .attr("transform", `translate(0,${innerHeight})`)
+            .call(d3.axisBottom(x).ticks(5))
+            .style("font-size", "10px")
+            .style("color", "#78716c");
+        
+        // Axis Label X (East)
+        g.append("text")
+            .attr("text-anchor", "end")
+            .attr("x", innerWidth)
+            .attr("y", innerHeight + 35)
+            .style("font-size", "10px")
+            .style("fill", "#78716c")
+            .text("E (东坐标)");
+
+        g.append("g")
+            .call(d3.axisLeft(y).ticks(5))
+            .style("font-size", "10px")
+            .style("color", "#78716c");
+
+        // Axis Label Y (North)
+        g.append("text")
+            .attr("text-anchor", "end")
+            .attr("transform", "rotate(-90)")
+            .attr("y", -35)
+            .attr("x", 0)
+            .style("font-size", "10px")
+            .style("fill", "#78716c")
+            .text("N (北坐标)");
+
+        // Points
+        const dots = g.selectAll("circle")
+            .data(mapData)
+            .enter()
+            .append("circle")
+            .attr("cx", d => x(d.e))
+            .attr("cy", d => y(d.n))
+            .attr("r", 4)
+            .style("fill", d => colorScale(d.name))
+            .style("opacity", 0.7)
+            .style("stroke", "white")
+            .style("stroke-width", 1);
+        
+        // Tooltip logic (simple title for now)
+        dots.append("title")
+            .text(d => `${d.name}\n${d.site} ${d.unit || ''}\nE: ${d.e}\nN: ${d.n}\nZ: ${d.z || '-'}`);
+
+        return;
+    }
+
+    // --- BAR CHART VIEW (Original Logic) ---
 
     // --- Prepare Data ---
     let dataMap: d3.InternMap<string, number>;
@@ -39,17 +163,13 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
         dataMap = d3.rollup(artifacts, v => v.length, d => d.material || '未知');
         colorHex = "#b45309"; // Terra-500
         break;
-      case 'category':
-        dataMap = d3.rollup(artifacts, v => v.length, d => d.category || '未分类');
-        colorHex = "#92400e"; // Terra-600
-        break;
       case 'unit':
         dataMap = d3.rollup(artifacts, v => v.length, d => d.unit || '未知单位');
         colorHex = "#57534e"; // Stone-600
         break;
-      case 'name':
+      case 'name': // Labeled as '器类' in UI
         dataMap = d3.rollup(artifacts, v => v.length, d => d.name || '未命名');
-        colorHex = "#44403c"; // Stone-700
+        colorHex = "#92400e"; // Terra-600 (Reusing the color from old category)
         break;
       default:
         return;
@@ -156,9 +276,9 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
 
   const tabs: {id: Tab, icon: React.FC<any>, label: string}[] = [
       { id: 'material', icon: Box, label: '质地' },
-      { id: 'category', icon: Shapes, label: '器类' },
-      { id: 'name', icon: Tag, label: '名称' },
+      { id: 'name', icon: Shapes, label: '器类' }, // Map 'name' data to '器类' label
       { id: 'unit', icon: Grid, label: '单位' },
+      { id: 'map', icon: MapIcon, label: '分布' },
   ];
 
   const activeTabItem = tabs.find(t => t.id === activeTab);
@@ -196,9 +316,9 @@ const StatsChart: React.FC<StatsChartProps> = ({ artifacts }) => {
                 <svg ref={chartRef} className="overflow-visible"></svg>
                 <p className="text-xs text-stone-400 mt-2">
                     {activeTab === 'material' && '按材质统计 (Top 8)'}
-                    {activeTab === 'category' && '按器物类别统计 (Top 8)'}
-                    {activeTab === 'name' && '按器物名称统计 (Top 8)'}
+                    {activeTab === 'name' && '按器物类别(名称)统计 (Top 8)'}
                     {activeTab === 'unit' && '按出土单位统计 (Top 8)'}
+                    {activeTab === 'map' && '遗物空间分布 (N-E 平面)'}
                 </p>
             </div>
             )}

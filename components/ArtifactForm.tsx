@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { Artifact, ArtifactCondition, ArtifactImage, ImageType, PhotoView } from '../types';
 import { analyzeArtifactPhoto, analyzeArtifactDrawing } from '../services/geminiService';
-import { Loader2, Sparkles, X, MapPin, Tag, Hash, Layers, Activity, Box, PenTool, ChevronDown, Plus, Trash2, Shapes, Edit3, User, List, Camera, PenTool as PenToolIcon, ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, ChevronLeft, ChevronRight, Image as ImageIcon, ChevronUp, Calendar, Ruler, ScanLine, Sticker, GripVertical } from 'lucide-react';
+import { Loader2, Sparkles, X, MapPin, Tag, Hash, Layers, Activity, Box, PenTool, ChevronDown, Plus, Trash2, Shapes, Edit3, User, List, Camera, PenTool as PenToolIcon, ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, ChevronLeft, ChevronRight, Image as ImageIcon, ChevronUp, Calendar, Ruler, ScanLine, Sticker, GripVertical, Zap, Brain, Compass, MoveVertical, Map as MapIcon } from 'lucide-react';
 
 interface ArtifactFormProps {
   initialData?: Artifact | null;
@@ -98,8 +98,6 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
       const newOptions = [value, ...localOptions];
       saveLocalOptions(newOptions);
       
-      // Auto-add to custom order at top? Or let it float?
-      // Let's add it to the top of custom order for immediate convenience
       const newOrder = [value, ...customOrder];
       saveCustomOrder(newOrder);
       
@@ -113,7 +111,6 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
     const newOptions = localOptions.filter(o => o !== opt);
     saveLocalOptions(newOptions);
     
-    // Also remove from custom order
     if (customOrder.includes(opt)) {
          const newOrder = customOrder.filter(p => p !== opt);
          saveCustomOrder(newOrder);
@@ -121,20 +118,14 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
   };
 
   const handleSort = () => {
-    // Duplicate items logic is handled by Set in saveCustomOrder, but let's be careful with indices
     if (dragItem.current === null || dragOverItem.current === null) return;
     
-    // We are reordering the *Display List*.
     const _displayOptions = [...displayOptions];
     const draggedItemContent = _displayOptions[dragItem.current];
 
-    // Remove from old index
     _displayOptions.splice(dragItem.current, 1);
-    // Insert at new index
     _displayOptions.splice(dragOverItem.current, 0, draggedItemContent);
 
-    // Save this new order as the Custom Order
-    // This effectively "captures" any recommended items into the custom order if they were moved
     saveCustomOrder(_displayOptions);
 
     dragItem.current = null;
@@ -151,28 +142,15 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- Sorting Logic: Custom Order -> Frequency -> History ---
   const displayOptions = useMemo(() => {
-      // 1. Custom Order (Manual Sort)
       const ordered = [...customOrder];
-
-      // 2. Recommendations (Frequency) - exclude already ordered
       const freq = recommendations.filter(r => !ordered.includes(r));
-      
-      // 3. Local History - exclude ordered & freq
       const history = localOptions.filter(o => !ordered.includes(o) && !recommendations.includes(o));
-      
       const all = [...ordered, ...freq, ...history];
       
-      // 4. Filter by input value
       if (!value || all.includes(value)) return all;
-      
-      // IMPORTANT: When filtering, the original order is preserved but subsets are shown.
-      // We disable drag-and-drop during filtering to avoid confusion.
       return all.filter(o => o.toLowerCase().includes(value.toLowerCase()));
   }, [customOrder, recommendations, localOptions, value]);
-
-  const isFiltering = !!value && !displayOptions.includes(value) && displayOptions.length !== (customOrder.length + recommendations.length + localOptions.length); // Rough check if filtering is active
 
   return (
     <div className="relative group w-full" ref={containerRef}>
@@ -232,22 +210,19 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
                     if (value) return;
                     dragItem.current = idx;
                     e.dataTransfer.effectAllowed = "move";
-                    // Minimal styling for the drag ghost if possible, or leave default
                 }}
                 onDragEnter={(e) => {
                     if (value) return;
                     dragOverItem.current = idx;
-                    // Could add visual reorder preview here if state allows
                 }}
                 onDragEnd={handleSort}
-                onDragOver={(e) => e.preventDefault()} // Necessary to allow dropping
+                onDragOver={(e) => e.preventDefault()}
                 onClick={() => {
                     onChange(opt);
                     setIsOpen(false);
                 }}
                 >
                 <div className="flex items-center gap-2 truncate flex-1">
-                     {/* Drag Handle - Only show when not filtering */}
                     {!value && (
                         <div className="text-stone-300 cursor-grab hover:text-stone-500 active:cursor-grabbing">
                             <GripVertical size={12} />
@@ -282,15 +257,23 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, storageKey
 // --- Reusable Icon Input for Standard Inputs ---
 interface IconInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: React.ElementType;
+  prefixText?: string;
 }
 
-const IconInput: React.FC<IconInputProps> = ({ icon: Icon, className, ...props }) => {
+const IconInput: React.FC<IconInputProps> = ({ icon: Icon, prefixText, className, ...props }) => {
     return (
         <div className="relative group w-full">
-            {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-terra-500 transition-colors z-10" />}
+            {prefixText ? (
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400 group-focus-within:text-terra-600 z-10 bg-white/50 px-1 rounded">
+                    {prefixText}
+                </div>
+            ) : (
+                Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-terra-500 transition-colors z-10" />
+            )}
+            
             <input 
                 {...props}
-                className={`w-full ${Icon ? 'pl-10' : 'pl-3'} pr-3 py-2.5 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 focus:border-terra-500 outline-none bg-white transition-all text-stone-700 placeholder:text-stone-300 ${className}`}
+                className={`w-full ${prefixText ? 'pl-8' : (Icon ? 'pl-10' : 'pl-3')} pr-3 py-2.5 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 focus:border-terra-500 outline-none bg-white transition-all text-stone-700 placeholder:text-stone-300 font-mono ${className}`}
             />
         </div>
     )
@@ -298,7 +281,7 @@ const IconInput: React.FC<IconInputProps> = ({ icon: Icon, className, ...props }
 
 const PHOTO_VIEWS: PhotoView[] = ['正', '背', '左', '右', '顶', '底', '特写', '其他'];
 
-// --- Memoized Filmstrip Item to prevent lag ---
+// --- Memoized Filmstrip Item ---
 const FilmstripItem = memo(({ 
     view, 
     isSelected, 
@@ -337,7 +320,6 @@ const FilmstripItem = memo(({
         </button>
     );
 }, (prev, next) => {
-    // Custom comparison to prevent re-renders if selection status and image existence haven't changed
     return prev.isSelected === next.isSelected && prev.image?.id === next.image?.id;
 });
 
@@ -351,12 +333,14 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     material: '',
     siteName: '',
     name: '',
-    remarks: '', // Init remarks
+    remarks: '',
+    coordinateN: '',
+    coordinateE: '',
+    coordinateZ: '',
     images: [],
     ...initialData
   });
 
-  // Calculate most frequent options based on existing data
   const sortedOptions = useMemo(() => {
     const calculateFrequency = (key: keyof Artifact) => {
         const map = new Map<string, number>();
@@ -366,7 +350,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 map.set(val, (map.get(val) || 0) + 1);
             }
         });
-        // Sort by frequency (desc)
         return Array.from(map.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
@@ -380,7 +363,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
         conditions: calculateFrequency('condition'),
         finders: calculateFrequency('finder'),
         recorders: calculateFrequency('recorder'),
-        remarks: calculateFrequency('remarks'), // Frequency for remarks
     };
   }, [existingArtifacts]);
 
@@ -391,11 +373,11 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   const [isDragging, setIsDragging] = useState(false);
   const [dragTarget, setDragTarget] = useState<ImageType | null>(null);
   
-  // Image Viewer Context State (List + Index)
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3-flash-preview');
+
   const [previewContext, setPreviewContext] = useState<{ images: ArtifactImage[], index: number } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
-  // Auto Rename Logic Helper
   const generateFileName = (view: string, type: ImageType) => {
     const parts = [
       formData.siteName,
@@ -424,7 +406,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   const [dimValues, setDimValues] = useState<Record<string, string>>(() => parseDimensions(initialData?.dimensions || ''));
 
   const dimMode = useMemo(() => {
-    const isPottery = formData.category?.includes('陶');
+    const isPottery = (formData.material || '').includes('陶') || (formData.name || '').includes('陶'); 
     const isGood = ['完整', '基本完整', '已修复', ArtifactCondition.INTACT, ArtifactCondition.NEARLY_INTACT, ArtifactCondition.RESTORED].includes(formData.condition || '');
     const isDamaged = ['残缺', ArtifactCondition.DAMAGED].includes(formData.condition || '');
 
@@ -436,7 +418,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
       if (isDamaged) return { fields: ['长', '宽', '残长'], label: '通用(残缺)' };
       return { fields: ['长', '宽', '高', '厚'], label: '通用(良好)' };
     }
-  }, [formData.category, formData.condition]);
+  }, [formData.material, formData.name, formData.condition]);
 
   useEffect(() => {
     const parts = dimMode.fields
@@ -462,11 +444,9 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Unified File Processor
   const processImageFile = async (file: File, type: ImageType, view?: PhotoView) => {
     setIsCompressing(true);
     try {
-      // Compress Image to Base64 String
       const base64Url = await compressImage(file);
       
       const finalView = view || '默认';
@@ -474,7 +454,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
         id: Date.now().toString() + Math.random(),
         type,
         view: finalView,
-        url: base64Url, // Store Base64 directly
+        url: base64Url,
         fileName: generateFileName(finalView, type)
       };
 
@@ -484,7 +464,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
               newImages = newImages.filter(img => !(img.type === type && img.view === finalView));
               newImages.push(newImage);
            } else {
-              // For drawings, we allow overwrite or simple add. Assuming 1 drawing for simplicity here.
               newImages = newImages.filter(img => img.type !== 'drawing');
               newImages.push(newImage);
               setSelectedDrawingId(newImage.id);
@@ -507,7 +486,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     }
   };
 
-  // Drag and Drop Handlers
   const handleDragOver = (e: React.DragEvent, type: ImageType) => {
     e.preventDefault();
     setIsDragging(true);
@@ -557,10 +535,8 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   }, [formData.images, selectedPhotoView]);
 
   const currentDrawing = useMemo(() => {
-    // For drawing, since we only want one essentially, just get the first one
     return getImagesByType('drawing')[0] || null;
   }, [formData.images]);
-
 
   const handlePhotoAnalysis = async () => {
     const imageToAnalyze = currentPhoto?.url;
@@ -571,7 +547,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
 
     setIsAnalyzing(true);
     try {
-      const result = await analyzeArtifactPhoto(imageToAnalyze);
+      const result = await analyzeArtifactPhoto(imageToAnalyze, selectedModel);
       if (result) {
         setFormData(prev => ({
           ...prev,
@@ -581,8 +557,14 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
         }));
         alert("AI 分析完成，已填入名称、质地和描述");
       }
-    } catch (error) {
-      alert("AI 分析服务暂时不可用");
+    } catch (error: any) {
+        const msg = error?.message || '';
+        if (msg.includes("不支持图片") || msg.includes("DeepSeek")) {
+             alert(msg);
+        } else {
+             alert("AI 分析服务暂时不可用，请检查网络或 API Key");
+        }
+        console.error(error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -597,13 +579,12 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
 
     setIsAnalyzing(true);
     try {
-      const result = await analyzeArtifactDrawing(imageToAnalyze);
+      const result = await analyzeArtifactDrawing(imageToAnalyze, selectedModel);
       if (result && result.dimensions) {
         setFormData(prev => ({
           ...prev,
           dimensions: result.dimensions || prev.dimensions
         }));
-        // Try to update parsed fields too if needed, but the main state is string
         const parsed = parseDimensions(result.dimensions);
         setDimValues(prev => ({...prev, ...parsed}));
         alert("AI 尺寸测量分析完成");
@@ -621,6 +602,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.siteName || !formData.name) {
+      // With native form validation, this might be redundant but safe
       alert("请填写必要的遗址名称和器物名称");
       return;
     }
@@ -641,9 +623,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     onSave(finalData as Omit<Artifact, 'id' | 'createdAt'>);
   };
 
-  // Preview Helpers
   const openPreview = (startImageId: string) => {
-      // Detect type based on ID
       const allImages = formData.images || [];
       const targetImg = allImages.find(i => i.id === startImageId);
       if(!targetImg) return;
@@ -651,7 +631,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
       const type = targetImg.type;
       let relevantImages = getImagesByType(type);
       
-      // Sort photos logically by view order
       if (type === 'photo') {
           relevantImages = relevantImages.sort((a, b) => {
               const idxA = PHOTO_VIEWS.indexOf(a.view as any);
@@ -707,24 +686,23 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   const labelClass = "block text-xs font-bold text-stone-500 mb-1.5 ml-1";
   
   return (
-    <div className="bg-white flex flex-col h-full relative animate-in fade-in zoom-in-95 duration-200">
+    <form className="bg-white flex flex-col h-full relative animate-in fade-in zoom-in-95 duration-200" onSubmit={handleSubmit}>
       <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100 shrink-0">
         <h2 className="text-xl font-serif text-stone-800 font-bold flex items-center gap-2">
           <span className="w-1.5 h-6 bg-terra-500 rounded-full inline-block"></span>
           {initialData ? `编辑记录: ${initialData.name}` : '登记新出土文物'}
         </h2>
-        <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 hover:bg-stone-100 p-1.5 rounded-full transition-colors">
+        <button type="button" onClick={onCancel} className="text-stone-400 hover:text-stone-600 hover:bg-stone-100 p-1.5 rounded-full transition-colors">
           <X size={20} />
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 overflow-y-auto p-6">
         
-        {/* Left Column: Image Management (Vertical Stack) */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-            
-            {/* 1. Photo Section */}
-            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
+        {/* Left Column: Image Management */}
+        <div className="lg:col-span-5 flex flex-col gap-6 h-full">
+            {/* Photo Section */}
+            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col shrink-0">
                 <div className="px-4 py-3 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
                     <h3 className="font-bold text-sm text-stone-700 flex items-center gap-2">
                         <Camera size={16} className="text-terra-500"/> 多视角影像
@@ -777,7 +755,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         )}
                     </div>
                     
-                    {/* Filmstrip */}
                     <div className="h-16 bg-stone-50 border border-stone-100 rounded-lg p-1.5 flex items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-stone-200 scrollbar-track-transparent">
                         {PHOTO_VIEWS.map(view => (
                             <FilmstripItem key={view} view={view} isSelected={selectedPhotoView === view} image={formData.images?.find(img => img.type === 'photo' && img.view === view)} onClick={setSelectedPhotoView} />
@@ -786,7 +763,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 </div>
             </div>
 
-            {/* 2. Drawing Section */}
+            {/* Drawing Section */}
             <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col flex-1">
                 <div className="px-4 py-3 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
                     <h3 className="font-bold text-sm text-stone-700 flex items-center gap-2">
@@ -840,7 +817,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
         </div>
 
         {/* Right Column: Form Layout */}
-        <div className="lg:col-span-7 space-y-6 pb-4">
+        <div className="lg:col-span-7 flex flex-col gap-5 pb-4 h-full">
              
              {/* Row 1: Site + Date */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -868,9 +845,9 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 </div>
              </div>
 
-             {/* Row 2: Unit Group (Gray Box) */}
-             <div className="bg-stone-50 p-4 rounded-xl border border-stone-100 grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <div>
+             {/* Row 2: Unit Group */}
+             <div className="bg-stone-50 p-4 rounded-xl border border-stone-100 grid grid-cols-1 md:grid-cols-12 gap-4">
+                 <div className="md:col-span-5">
                     <label className={labelClass}>单位</label>
                     <IconInput 
                         type="text" 
@@ -881,7 +858,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         icon={Hash}
                     />
                  </div>
-                 <div>
+                 <div className="md:col-span-3">
                     <label className={labelClass}>层位</label>
                     <IconInput 
                         type="text" 
@@ -892,7 +869,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         icon={Layers} 
                     />
                  </div>
-                 <div>
+                 <div className="md:col-span-4">
                     <label className={labelClass}>编号</label>
                     <IconInput 
                         type="text" 
@@ -904,22 +881,48 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                     />
                  </div>
              </div>
-             
-             {/* Row 3: Name + Category */}
+
+             {/* Row 3: Name + Material */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
                     <div className="flex justify-between items-center mb-1.5">
                         <label className="text-xs font-bold text-stone-500 ml-1">器物名称 *</label>
-                        <button 
-                            type="button" 
-                            onClick={handlePhotoAnalysis}
-                            disabled={isAnalyzing}
-                            className="text-[10px] font-bold text-terra-600 hover:text-terra-700 hover:bg-terra-50 px-2 py-0.5 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0"
-                            title="根据左侧照片自动填写名称、质地和描述"
-                        >
-                            {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                            AI 智能识别
-                        </button>
+                        <div className="flex items-center gap-2">
+                             <div className="relative group/model">
+                                <select 
+                                    value={selectedModel}
+                                    onChange={(e) => setSelectedModel(e.target.value)}
+                                    className="appearance-none bg-stone-50 border border-stone-200 text-[10px] font-bold text-stone-600 rounded px-2 py-0.5 pr-4 cursor-pointer hover:bg-stone-100 hover:border-terra-300 focus:outline-none transition-colors max-w-[120px]"
+                                    title="选择 AI 模型"
+                                >
+                                    <optgroup label="Gemini 3 (最新预览)">
+                                        <option value="gemini-3-flash-preview">⚡ 3.0 Flash (推荐)</option>
+                                        <option value="gemini-3-pro-preview">🧠 3.0 Pro (最强)</option>
+                                    </optgroup>
+                                    <optgroup label="免费/通用层级">
+                                        <option value="gemini-2.0-flash">🚀 2.0 Flash</option>
+                                        <option value="gemini-flash-latest">✨ 1.5 Flash</option>
+                                        <option value="gemini-flash-lite-latest">🍃 Flash Lite</option>
+                                    </optgroup>
+                                    <optgroup label="DeepSeek (需配置 Key)">
+                                        <option value="deepseek-chat">DeepSeek V3 (Chat)</option>
+                                        <option value="deepseek-reasoner">DeepSeek R1 (推理)</option>
+                                    </optgroup>
+                                </select>
+                                <ChevronDown size={10} className="absolute right-1 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+                             </div>
+
+                             <button 
+                                type="button" 
+                                onClick={handlePhotoAnalysis}
+                                disabled={isAnalyzing}
+                                className="text-[10px] font-bold text-terra-600 hover:text-terra-700 hover:bg-terra-50 px-2 py-0.5 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0"
+                                title="根据左侧照片自动填写名称、质地和描述"
+                            >
+                                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                AI 识别
+                            </button>
+                        </div>
                     </div>
                     <CustomSelect 
                         value={formData.name || ''} 
@@ -932,21 +935,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                     />
                  </div>
                  <div>
-                    <label className={labelClass}>器类</label>
-                    <CustomSelect 
-                        value={formData.category || ''} 
-                        onChange={handleValueUpdate('category')} 
-                        storageKey="category"
-                        recommendations={sortedOptions.categories}
-                        placeholder="类别 (如: 陶器)"
-                        icon={Shapes}
-                    />
-                 </div>
-             </div>
-
-             {/* Row 4: Material + Quantity + Condition */}
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
                     <label className={labelClass}>质地</label>
                     <CustomSelect 
                         value={formData.material || ''} 
@@ -956,7 +944,11 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         placeholder="质地"
                         icon={Box}
                     />
-                </div>
+                 </div>
+             </div>
+
+             {/* Row 4: Quantity + Condition */}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label className={labelClass}>数量</label>
                     <IconInput 
@@ -981,12 +973,51 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 </div>
              </div>
 
-             {/* Row 5: Dimensions Card */}
-             <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-stone-100 flex justify-between items-center bg-stone-50/30">
+             {/* Row 5: Coordinates */}
+             <div>
+                 <label className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <MapIcon size={12} /> 出土坐标 (CGCS2000)
+                 </label>
+                 <div className="grid grid-cols-3 gap-4">
+                     <div>
+                        <IconInput 
+                            type="text" 
+                            name="coordinateN" 
+                            value={formData.coordinateN || ''} 
+                            onChange={handleInputChange} 
+                            placeholder=""
+                            prefixText="N"
+                        />
+                     </div>
+                     <div>
+                        <IconInput 
+                            type="text" 
+                            name="coordinateE" 
+                            value={formData.coordinateE || ''} 
+                            onChange={handleInputChange} 
+                            placeholder="" 
+                            prefixText="E"
+                        />
+                     </div>
+                     <div>
+                        <IconInput 
+                            type="text" 
+                            name="coordinateZ" 
+                            value={formData.coordinateZ || ''} 
+                            onChange={handleInputChange} 
+                            placeholder="" 
+                            prefixText="Z"
+                        />
+                     </div>
+                 </div>
+             </div>
+
+             {/* Row 6: Dimensions Card */}
+             <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                <div className="flex justify-between items-center mb-2">
                      <div className="flex items-center gap-2">
-                        <label className="text-sm font-bold text-stone-700">尺寸信息</label>
-                        <span className="text-[10px] text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">{dimMode.label}</span>
+                        <label className={labelClass.replace('mb-1.5', 'mb-0')}>尺寸信息</label>
+                        <span className="text-[10px] text-stone-400 font-normal border border-stone-200 px-1.5 rounded">{dimMode.label}</span>
                      </div>
                      <button 
                         type="button" 
@@ -1000,27 +1031,54 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                     </button>
                 </div>
                 
-                <div className="p-5">
-                    <div className="flex gap-4 mb-2">
-                        {dimMode.fields.map(field => (
-                            <div key={field} className="flex-1 relative group">
-                                <div className="absolute top-1 left-2 text-[10px] text-stone-400 font-bold pointer-events-none">{field}</div>
-                                <input 
-                                    type="text" 
-                                    value={dimValues[field] || ''} 
-                                    onChange={(e) => handleDimChange(field, e.target.value)}
-                                    className="w-full px-3 pt-5 pb-1.5 text-sm border border-stone-200 rounded-lg bg-stone-50/30 focus:bg-white focus:border-terra-400 focus:ring-2 focus:ring-terra-500/10 outline-none transition-all pr-8 font-mono text-stone-700 placeholder:text-transparent"
-                                    placeholder={field}
-                                />
-                                <span className="absolute right-3 top-1/2 translate-y-1 text-stone-400 text-xs pointer-events-none">cm</span>
-                            </div>
-                        ))}
-                    </div>
-                    <p className="text-[10px] text-stone-400 italic mt-2">* 请输入数字，系统将自动格式化。AI 测算结果仅供参考。</p>
+                <div className="flex gap-4 mb-2">
+                    {dimMode.fields.map(field => (
+                        <div key={field} className="flex-1 relative group">
+                            <div className="absolute top-1 left-2 text-[10px] text-stone-400 font-bold pointer-events-none">{field}</div>
+                            <input 
+                                type="text" 
+                                value={dimValues[field] || ''} 
+                                onChange={(e) => handleDimChange(field, e.target.value)}
+                                className="w-full px-3 pt-5 pb-1.5 text-sm border border-stone-200 rounded-lg bg-stone-50/30 focus:bg-white focus:border-terra-400 focus:ring-2 focus:ring-terra-500/10 outline-none transition-all pr-8 font-mono text-stone-700 placeholder:text-transparent"
+                                placeholder={field}
+                            />
+                            <span className="absolute right-3 top-1/2 translate-y-1 text-stone-400 text-xs pointer-events-none">cm</span>
+                        </div>
+                    ))}
+                </div>
+                <p className="text-[10px] text-stone-400 italic mt-1 ml-1">* 请输入数字，系统将自动格式化。AI 测算结果仅供参考。</p>
+             </div>
+
+             {/* Row 7: Description */}
+             <div>
+                <label className={labelClass}>器物描述</label>
+                <textarea 
+                    name="description" 
+                    value={formData.description || ''} 
+                    onChange={handleInputChange} 
+                    rows={5} 
+                    className="w-full px-3 py-3 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 outline-none resize-none bg-white text-stone-700 placeholder:text-stone-300"
+                    placeholder="记录文物的形态、纹饰、风格等详细信息..."
+                />
+             </div>
+             
+             {/* Row 8: Remarks */}
+             <div>
+                <label className={labelClass}>备注</label>
+                <div className="relative group w-full">
+                    <Sticker className="absolute left-3 top-3 w-4 h-4 text-stone-400 group-focus-within:text-terra-500 transition-colors z-10" />
+                    <textarea 
+                        name="remarks" 
+                        value={formData.remarks || ''} 
+                        onChange={handleInputChange} 
+                        rows={4}
+                        className="w-full pl-10 pr-3 py-2.5 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 focus:border-terra-500 outline-none bg-white transition-all text-stone-700 placeholder:text-stone-300 resize-none"
+                        placeholder="填写备注信息..." 
+                    />
                 </div>
              </div>
 
-             {/* Row 6: Personnel */}
+             {/* Row 9: Personnel */}
              <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className={labelClass}>发现者</label>
@@ -1030,33 +1088,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                     <label className={labelClass}>录入者</label>
                     <CustomSelect value={formData.recorder || ''} onChange={handleValueUpdate('recorder')} storageKey="recorder" recommendations={sortedOptions.recorders} placeholder="姓名" icon={Edit3} />
                  </div>
-             </div>
-
-             {/* Row 7: Remarks & Description */}
-             <div className="space-y-4">
-                <div>
-                   <label className={labelClass}>备注</label>
-                   <CustomSelect 
-                        value={formData.remarks || ''} 
-                        onChange={handleValueUpdate('remarks')} 
-                        storageKey="remarks" 
-                        recommendations={sortedOptions.remarks} 
-                        placeholder="例如: 采集, 征集, 旧藏, 展出..." 
-                        icon={Sticker} 
-                   />
-                </div>
-                
-                <div>
-                    <label className={labelClass}>详细记录</label>
-                    <textarea 
-                        name="description" 
-                        value={formData.description || ''} 
-                        onChange={handleInputChange} 
-                        rows={3} 
-                        className="w-full px-3 py-3 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-terra-500/20 outline-none resize-none bg-white text-stone-700 placeholder:text-stone-300"
-                        placeholder="记录文物的形态、纹饰、风格等详细信息..."
-                    />
-                </div>
              </div>
         </div>
       </div>
@@ -1071,8 +1102,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                 取消
             </button>
             <button 
-                type="button"
-                onClick={handleSubmit}
+                type="submit"
                 className="px-6 py-2 rounded-xl bg-terra-600 hover:bg-terra-700 text-white font-bold shadow-lg shadow-terra-600/20 active:scale-95 transition-all text-sm flex items-center gap-2"
             >
                 <Edit3 size={16} /> 保存档案
@@ -1120,7 +1150,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
              </div>
          </div>
       )}
-    </div>
+    </form>
   );
 };
 
