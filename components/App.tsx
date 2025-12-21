@@ -379,10 +379,9 @@ const App: React.FC = () => {
                <div className="text-terra-500 cursor-pointer">
                  <AppLogo className="w-6 h-6" />
                </div>
-               <div className="flex flex-col cursor-pointer">
-                  <h1 className="text-lg font-serif font-bold text-white leading-tight tracking-tight">Archaeology</h1>
-                  <span className="text-[10px] text-stone-400">考古出土器物数字档案</span>
-               </div>
+               <h1 className="text-lg font-serif font-bold text-white tracking-wide cursor-pointer">
+                  考古出土器物数字档案
+               </h1>
              </div>
              
              <div className="flex items-center gap-4">

@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { User as UserIcon, Lock, ArrowRight, Sparkles } from 'lucide-react';
+import { User as UserIcon, Lock, ArrowRight, CheckSquare, Square } from 'lucide-react';
 
 interface LoginScreenProps {
   onLogin: (user: User) => void;
@@ -13,9 +13,63 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // New State for features
+  const [rememberPassword, setRememberPassword] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(false);
+
   // Pre-fill generic avatar if empty
   const getAvatar = (name: string) => 
     `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=b45309&color=fff`;
+
+  // Check for saved credentials on mount
+  useEffect(() => {
+    const savedPref = localStorage.getItem('archaeo_login_pref');
+    if (savedPref) {
+      const pref = JSON.parse(savedPref);
+      if (pref.remember) {
+        setUsername(pref.username || '');
+        setPassword(pref.password || '');
+        setRememberPassword(true);
+        setAutoLogin(pref.autoLogin || false);
+
+        // Trigger Auto Login
+        if (pref.autoLogin && pref.username && pref.password) {
+            performLogin(pref.username, pref.password, true);
+        }
+      }
+    }
+  }, []);
+
+  const performLogin = (u: string, p: string, isAuto: boolean = false) => {
+    try {
+        const storedUsers = localStorage.getItem('archaeo_users');
+        const users: User[] = storedUsers ? JSON.parse(storedUsers) : [];
+
+        const user = users.find(existing => existing.username === u && existing.password === p);
+        
+        // Backdoor for admin/admin
+        if (!user && u === 'admin' && p === 'admin') {
+             const adminUser = {
+                username: 'admin',
+                displayName: '管理员',
+                avatarUrl: getAvatar('Admin')
+             };
+             onLogin(adminUser);
+             return true;
+        }
+
+        if (user) {
+          onLogin(user);
+          return true;
+        } else {
+          if (!isAuto) setError('用户名或密码错误');
+          return false;
+        }
+    } catch (err) {
+        if (!isAuto) setError('系统错误');
+        return false;
+    }
+  };
 
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,26 +101,29 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         
         const updatedUsers = [...users, newUser];
         localStorage.setItem('archaeo_users', JSON.stringify(updatedUsers));
+        
+        // Auto save pref on register if checked
+        if (rememberPassword) {
+            localStorage.setItem('archaeo_login_pref', JSON.stringify({
+                username, password, remember: true, autoLogin
+            }));
+        } else {
+            localStorage.removeItem('archaeo_login_pref');
+        }
+
         onLogin(newUser);
       } else {
         // Login Logic
-        const user = users.find(u => u.username === username && u.password === password);
-        
-        // Backdoor for admin/admin if no users exist or just strictly check
-        if (!user && username === 'admin' && password === 'admin') {
-             const adminUser = {
-                username: 'admin',
-                displayName: '管理员',
-                avatarUrl: getAvatar('Admin')
-             };
-             onLogin(adminUser);
-             return;
-        }
-
-        if (user) {
-          onLogin(user);
-        } else {
-          setError('用户名或密码错误');
+        const success = performLogin(username, password);
+        if (success) {
+            // Save Preferences
+            if (rememberPassword) {
+                localStorage.setItem('archaeo_login_pref', JSON.stringify({
+                    username, password, remember: true, autoLogin
+                }));
+            } else {
+                localStorage.removeItem('archaeo_login_pref');
+            }
         }
       }
     } catch (err) {
@@ -123,6 +180,36 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               </div>
             </div>
             
+            {!isRegistering && (
+                <div className="flex items-center justify-between px-1">
+                    <div 
+                        className="flex items-center gap-2 cursor-pointer group"
+                        onClick={() => {
+                            const newState = !rememberPassword;
+                            setRememberPassword(newState);
+                            if (!newState) setAutoLogin(false); // Uncheck auto login if remember is unchecked
+                        }}
+                    >
+                        {rememberPassword ? 
+                            <CheckSquare size={16} className="text-terra-600" /> : 
+                            <Square size={16} className="text-stone-300 group-hover:text-stone-400" />
+                        }
+                        <span className={`text-xs font-bold ${rememberPassword ? 'text-terra-700' : 'text-stone-400 group-hover:text-stone-500'}`}>记住密码</span>
+                    </div>
+
+                    <div 
+                        className={`flex items-center gap-2 cursor-pointer group ${!rememberPassword ? 'opacity-50 pointer-events-none' : ''}`}
+                        onClick={() => setAutoLogin(!autoLogin)}
+                    >
+                         {autoLogin ? 
+                            <CheckSquare size={16} className="text-terra-600" /> : 
+                            <Square size={16} className="text-stone-300 group-hover:text-stone-400" />
+                        }
+                        <span className={`text-xs font-bold ${autoLogin ? 'text-terra-700' : 'text-stone-400 group-hover:text-stone-500'}`}>自动登录</span>
+                    </div>
+                </div>
+            )}
+
             {error && <div className="text-red-500 text-sm text-center bg-red-50 py-2 rounded-lg font-medium">{error}</div>}
 
             <button type="submit" className="w-full bg-stone-900 text-white font-bold py-4 rounded-xl hover:bg-stone-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-2 mt-4 group">
