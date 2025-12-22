@@ -23,7 +23,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   // Check for saved credentials on mount
   useEffect(() => {
-    const savedPref = localStorage.getItem('archaeo_login_pref');
+    const savedPref = localStorage.getItem('archaeology_login_pref');
     if (savedPref) {
       const pref = JSON.parse(savedPref);
       if (pref.remember) {
@@ -42,7 +42,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   const performLogin = (u: string, p: string, isAuto: boolean = false) => {
     try {
-        const storedUsers = localStorage.getItem('archaeo_users');
+        const storedUsers = localStorage.getItem('archaeology_users');
         const users: User[] = storedUsers ? JSON.parse(storedUsers) : [];
 
         const user = users.find(existing => existing.username === u && existing.password === p);
@@ -81,7 +81,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     }
 
     try {
-      const storedUsers = localStorage.getItem('archaeo_users');
+      const storedUsers = localStorage.getItem('archaeology_users');
       const users: User[] = storedUsers ? JSON.parse(storedUsers) : [];
 
       if (isRegistering) {
@@ -100,15 +100,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         };
         
         const updatedUsers = [...users, newUser];
-        localStorage.setItem('archaeo_users', JSON.stringify(updatedUsers));
+        localStorage.setItem('archaeology_users', JSON.stringify(updatedUsers));
         
         // Auto save pref on register if checked
         if (rememberPassword) {
-            localStorage.setItem('archaeo_login_pref', JSON.stringify({
+            localStorage.setItem('archaeology_login_pref', JSON.stringify({
                 username, password, remember: true, autoLogin
             }));
         } else {
-            localStorage.removeItem('archaeo_login_pref');
+            localStorage.removeItem('archaeology_login_pref');
         }
 
         onLogin(newUser);
@@ -118,11 +118,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         if (success) {
             // Save Preferences
             if (rememberPassword) {
-                localStorage.setItem('archaeo_login_pref', JSON.stringify({
+                localStorage.setItem('archaeology_login_pref', JSON.stringify({
                     username, password, remember: true, autoLogin
                 }));
             } else {
-                localStorage.removeItem('archaeo_login_pref');
+                localStorage.removeItem('archaeology_login_pref');
             }
         }
       }

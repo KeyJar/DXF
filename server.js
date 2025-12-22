@@ -11,7 +11,7 @@ const PORT = 3001; // 后端运行端口
 
 // --- 配置区域 ---
 // 请将此路径改为您 NAS 挂载在电脑上的实际路径
-// 例如 Windows: "Z:\\ArchaeoData" 或 Mac: "/Volumes/Public/ArchaeoData"
+// 例如 Windows: "Z:\\ArchaeologyData" 或 Mac: "/Volumes/Public/ArchaeologyData"
 // 在 Docker 中，我们将映射到 /app/nas_data
 const NAS_ROOT = process.env.NAS_PATH || path.join(__dirname, 'nas_data');
 const DATA_FILE = path.join(NAS_ROOT, 'db.json');
@@ -100,7 +100,7 @@ app.get('*', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ======================================================
-  ArchaeoLog NAS 服务器已启动 (Docker Mode)
+  Archaeology NAS 服务器已启动 (Docker Mode)
   
   运行端口: ${PORT}
   数据存储路径: ${NAS_ROOT}

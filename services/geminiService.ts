@@ -2,9 +2,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  // 尝试多种方式获取 Key，兼容 Vite (Netlify常用) 和传统的 process.env
+  // 注意：在 Vite 环境中，process 可能未定义，需做安全检查
+  let apiKey = '';
+  try {
+      // @ts-ignore - 忽略 TS 检查 import.meta
+      if (typeof import.meta !== 'undefined' && import.meta.env) {
+          // @ts-ignore
+          apiKey = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+      }
+  } catch (e) {}
+
+  if (!apiKey && typeof process !== 'undefined' && process.env) {
+      apiKey = process.env.API_KEY || process.env.REACT_APP_API_KEY || '';
+  }
+
   if (!apiKey) {
-    throw new Error("API Key not found (process.env.API_KEY)");
+    console.warn("未检测到 API Key。AI 功能将不可用。请在 Netlify 环境变量中设置 VITE_API_KEY 或 API_KEY。");
+    // 返回一个带空 Key 的实例，防止页面直接白屏崩溃，但在调用时会报错
+    return new GoogleGenAI({ apiKey: 'MISSING_KEY' });
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -13,9 +29,21 @@ const cleanBase64 = (base64Image: string) => base64Image.split(',')[1] || base64
 
 // --- DeepSeek / OpenAI Compatible Helper ---
 const callDeepSeekAPI = async (modelId: string, systemPrompt: string, base64Image: string, jsonSchema: any) => {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    let apiKey = '';
+    try {
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            // @ts-ignore
+            apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY || import.meta.env.DEEPSEEK_API_KEY;
+        }
+    } catch (e) {}
+    
+    if (!apiKey && typeof process !== 'undefined' && process.env) {
+        apiKey = process.env.DEEPSEEK_API_KEY || '';
+    }
+
     if (!apiKey) {
-        throw new Error("未配置 DeepSeek API Key (process.env.DEEPSEEK_API_KEY)");
+        throw new Error("未配置 DeepSeek API Key (VITE_DEEPSEEK_API_KEY 或 DEEPSEEK_API_KEY)");
     }
 
     const messages = [
