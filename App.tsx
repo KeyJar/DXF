@@ -6,8 +6,8 @@ import StatsChart from './components/StatsChart';
 import ArtifactForm from './components/ArtifactForm';
 import ArtifactDetails from './components/ArtifactDetails';
 import LoginScreen from './components/LoginScreen';
-import { Artifact, User } from '../types';
-import { api } from '../services/api';
+import { Artifact, User } from './types';
+import { api } from './services/api';
 
 // Simple Logo Component - Sharper Tip, Smooth Handle, Tilted 45 Degrees
 const AppLogo = ({ className }: { className?: string }) => (
@@ -85,7 +85,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
         try {
-            const savedUser = localStorage.getItem('archaeo_current_user');
+            const savedUser = localStorage.getItem('archaeology_current_user');
             if (savedUser) {
                 setUser(JSON.parse(savedUser));
                 // Load artifacts from server if user is logged in
@@ -119,13 +119,13 @@ const App: React.FC = () => {
 
   const handleLogin = async (userData: User) => {
     setUser(userData);
-    localStorage.setItem('archaeo_current_user', JSON.stringify(userData));
+    localStorage.setItem('archaeology_current_user', JSON.stringify(userData));
     await loadArtifacts();
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('archaeo_current_user');
+    localStorage.removeItem('archaeology_current_user');
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,7 +153,7 @@ const App: React.FC = () => {
     try {
         const updatedUser = await api.updateProfile(updatedData);
         setUser(updatedUser);
-        localStorage.setItem('archaeo_current_user', JSON.stringify(updatedUser));
+        localStorage.setItem('archaeology_current_user', JSON.stringify(updatedUser));
         alert('个人信息已更新');
     } catch(err) {
         console.error("Update failed", err);
@@ -328,7 +328,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `archaeolog_backup_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `archaeology_backup_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -406,7 +406,7 @@ const App: React.FC = () => {
              </div>
              <div>
                 <div className="text-stone-100 font-bold text-lg">{user?.displayName}</div>
-                <div className="text-stone-500 text-xs font-mono">@{user?.username}</div>
+                <div className="text-stone-500 text-xs font-mono">{user?.username}</div>
              </div>
              <div className="ml-auto bg-stone-700 p-2 rounded-full text-stone-400">
                 <Settings size={16} />
@@ -474,7 +474,7 @@ const App: React.FC = () => {
                </div>
                <div className="flex flex-col justify-center">
                   <h1 className="text-base md:text-xl font-serif font-bold text-stone-100 tracking-wide leading-none group-hover:text-white transition-colors">
-                     ArchaeoLog
+                     Archaeology
                   </h1>
                   <span className="text-[10px] font-bold text-stone-500 tracking-wider mt-1 hidden md:block">
                      考古出土器物数字档案
@@ -506,7 +506,7 @@ const App: React.FC = () => {
                    >
                       <div className="text-right">
                           <div className="text-xs font-bold text-stone-300 group-hover:text-white transition-colors leading-tight">{user.displayName}</div>
-                          <div className="text-[9px] text-stone-600 font-mono group-hover:text-terra-500 transition-colors leading-tight mt-0.5">@{user.username}</div>
+                          <div className="text-[9px] text-stone-600 font-mono group-hover:text-terra-500 transition-colors leading-tight mt-0.5">{user.username}</div>
                       </div>
                       <div className="relative">
                           <img src={user.avatarUrl} className="w-9 h-9 rounded-full border-2 border-stone-800 group-hover:border-terra-500/50 transition-colors object-cover shadow-lg" alt="User" />
@@ -732,7 +732,7 @@ const App: React.FC = () => {
                       <div className="absolute bottom-0 left-0 w-24 h-24 bg-stone-700/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
                       <h3 className="text-terra-500 font-serif font-bold text-xl mb-4 relative z-10">数字化出土文档</h3>
                       <p className="text-stone-400 text-xs leading-relaxed mb-8 font-serif italic relative z-10">
-                        " 考古发掘是对人类文明碎片的重构。ArchaeoLog 致力于将每一次铲尖的发现，转化为永恒的数字印记。 "
+                        " 考古发掘是对人类文明碎片的重构。Archaeology 致力于将每一次铲尖的发现，转化为永恒的数字印记。 "
                       </p>
                       <button className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-white border border-stone-700 px-6 py-3 rounded-full hover:bg-white hover:text-stone-900 transition-all uppercase relative z-10">
                          <Camera size={12} /> Professional Archive
@@ -787,7 +787,7 @@ const App: React.FC = () => {
                      </nav>
 
                      <div className="mt-auto hidden md:block px-4 py-4">
-                        <div className="text-[10px] text-stone-400 font-mono">ArchaeoLog v1.3.0</div>
+                        <div className="text-[10px] text-stone-400 font-mono">Archaeology v1.3.0</div>
                      </div>
                  </div>
 
@@ -898,7 +898,7 @@ const App: React.FC = () => {
                                        className="hidden" 
                                        accept="image/*"
                                     />
-                                    <span className="text-xs text-stone-400 font-mono mt-2">@{user.username}</span>
+                                    <span className="text-xs text-stone-400 font-mono mt-2">{user.username}</span>
                                 </div>
 
                                 <div>
@@ -926,7 +926,7 @@ const App: React.FC = () => {
                          <div className="animate-in fade-in duration-300">
                              <div className="mb-8">
                                  <h3 className="text-xl font-bold text-stone-800">更新日志</h3>
-                                 <p className="text-stone-500 text-sm mt-1">ArchaeoLog 版本历史记录</p>
+                                 <p className="text-stone-500 text-sm mt-1">Archaeology 版本历史记录</p>
                              </div>
 
                              <div className="space-y-8 relative before:absolute before:inset-0 before:ml-2.5 before:w-0.5 before:-translate-x-px before:bg-stone-200 before:h-full">
@@ -984,15 +984,15 @@ const App: React.FC = () => {
                                 <AppLogo className="w-12 h-12" />
                              </div>
                              
-                             <h2 className="text-3xl font-serif font-bold text-stone-800 mb-2">ArchaeoLog</h2>
+                             <h2 className="text-3xl font-serif font-bold text-stone-800 mb-2">Archaeology</h2>
                              <p className="text-stone-500 font-medium mb-8">考古出土器物数字档案系统</p>
 
                              <div className="max-w-md text-stone-600 text-sm leading-relaxed mb-10 space-y-4">
                                  <p>
-                                     ArchaeoLog 是一款专为考古工作者设计的数字化记录工具。它致力于解决田野发掘与室内整理过程中的信息碎片化问题，通过高效的结构化录入和 AI 辅助识别，将每一件出土器物转化为永恒的数字资产。
+                                     Archaeology 是一款专为考古工作者设计的数字化记录工具。它致力于解决田野发掘与室内整理过程中的信息碎片化问题，通过高效的结构化录入，将每一件出土器物转化为永恒的数字资产。
                                  </p>
                                  <p>
-                                     系统集成了 Gemini 与 DeepSeek 等先进大模型，支持从照片中自动提取器物特征、估算尺寸，并提供多维度的统计分析功能。
+                                     系统支持多视角照片拍摄、自动编号管理、信息检索导出，并提供多维度的统计分析功能。
                                  </p>
                              </div>
 
@@ -1011,7 +1011,7 @@ const App: React.FC = () => {
                              </div>
 
                              <div className="mt-12 text-xs text-stone-300 font-mono">
-                                 © 2024 ArchaeoLog. All rights reserved.
+                                 © 2024 Archaeology. All rights reserved.
                              </div>
                          </div>
                      )}
