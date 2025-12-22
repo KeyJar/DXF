@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import JSZip from 'jszip';
 import { Artifact, ArtifactCondition, ArtifactImage, ImageType, PhotoView } from '../types';
@@ -13,38 +12,14 @@ interface ArtifactFormProps {
   onCancel: () => void;
 }
 
-// --- 图片压缩工具 ---
-const compressImage = (file: File, maxWidth = 1280, maxHeight = 1280): Promise<string> => {
+// --- 图片处理工具 (不再压缩) ---
+const readImageFile = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.onerror = () => reject(new Error("Image load failed"));
+      // 直接返回原始 Base64，不进行 Canvas 压缩
+      resolve(event.target?.result as string);
     };
     reader.onerror = () => reject(new Error("File read failed"));
   });
@@ -270,7 +245,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   const [dragTarget, setDragTarget] = useState<ImageType | null>(null);
   const [previewContext, setPreviewContext] = useState<{ images: ArtifactImage[], index: number } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [isZipping, setIsZipping] = useState(false);
 
   // Stats for Recommendations
   const sortedOptions = useMemo(() => {
@@ -297,25 +271,23 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   }, [existingArtifacts]);
 
   // Naming Rule: 遗址名+单位+层位+编号+器名+照片视角/线图
-  const generateFileName = (view: string, type: ImageType, strictFormat: boolean = false) => {
-    const parts = [
-      formData.siteName,
-      formData.unit,
-      formData.layer,
-      formData.serialNumber,
-      formData.name
-    ];
+  const generateFileName = (view: string, type: ImageType) => {
+    const safe = (str: string | undefined) => (str || '').trim();
+    const site = safe(formData.siteName);
+    const unit = safe(formData.unit);
+    const layer = safe(formData.layer);
+    const serial = safe(formData.serialNumber);
+    const name = safe(formData.name);
     
-    // For strict format (download), we filter empty but join with hyphen for readability
-    const baseName = parts.filter(p => p && p.trim()).join('-');
-    
-    if (!strictFormat) {
-       // Old simple format for internal state if needed, but let's align them.
-       // Only difference is suffixes.
+    let viewLabel = view || (type === 'drawing' ? '线图' : '照片');
+    // Align "正" to "正视图" to match example if it's a standard view
+    if (type === 'photo' && ['正','背','左','右','顶','底'].includes(viewLabel)) {
+        viewLabel += '视图';
     }
 
-    const suffix = type === 'photo' ? (view === '其他' ? '照片' : view) : '线图';
-    return `${baseName}-${suffix}.jpg`;
+    // Format: 东下冯遗址2025XDH1003①-1 陶鬲-正视图
+    // [Site][Unit][Layer]-[Serial] [Name]-[View].jpg
+    return `${site}${unit}${layer}-${serial} ${name}-${viewLabel}.jpg`;
   };
 
   const parseDimensions = (dimStr: string) => {
@@ -368,14 +340,16 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     setDimValues(prev => ({ ...prev, [field]: sanitized }));
   };
 
-  const handleValueUpdate = <K extends keyof Artifact>(name: K) => (value: Artifact[K]) => {
+  // Fixed: Allow 'any' value to prevent strict type mismatch errors when using CustomSelect
+  const handleValueUpdate = <K extends keyof Artifact>(name: K) => (value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const processImageFile = async (file: File, type: ImageType, view?: PhotoView) => {
     setIsCompressing(true);
     try {
-      const base64Url = await compressImage(file);
+      // CHANGED: Use readImageFile (no compression) instead of compressImage
+      const base64Url = await readImageFile(file);
       const finalView = view || '默认';
       const newImage: ArtifactImage = {
         id: Date.now().toString() + Math.random(),
@@ -435,8 +409,13 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
     const updatedImages = formData.images?.map(img => ({ ...img, fileName: generateFileName(img.view || 'image', img.type) })) || [];
     const thumbnail = updatedImages.find(img => img.type === 'photo' && img.view === '正')?.url || updatedImages[0]?.url;
 
-    const finalData = { ...formData, images: updatedImages, imageUrl: thumbnail };
-    onSave(finalData as Omit<Artifact, 'id' | 'createdAt'>, closeForm);
+    const finalData = { 
+      ...formData, 
+      quantity: Number(formData.quantity) || 1,
+      images: updatedImages, 
+      imageUrl: thumbnail 
+    };
+    onSave(finalData as unknown as Omit<Artifact, 'id' | 'createdAt'>, closeForm);
     
     if (!closeForm) {
         // Reset form but keep Context (Site, Unit, Layer, Date, Finder, Recorder)
@@ -466,11 +445,12 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
       setIsAIAnalyzing(true);
       try {
           // Explicitly define category type to match AI service signature and avoid type errors
-          const aiCategory = formData.categoryType === '小件' ? '小件' : '陶器';
+          const currentType = formData.categoryType;
+          const aiCategory: '陶器' | '小件' = (currentType === '小件') ? '小件' : '陶器';
           
           const result = await analyzeArtifactPhoto(
               currentPhoto.url, 
-              aiCategory as '陶器' | '小件',
+              aiCategory,
               activeModelId
           );
           setFormData(prev => ({
@@ -507,47 +487,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
           alert("AI 测量失败: " + e.message);
       } finally {
           setIsAIAnalyzing(false);
-      }
-  };
-
-  const handleBatchDownload = async () => {
-      if (!formData.images || formData.images.length === 0) {
-          alert("暂无图片可下载");
-          return;
-      }
-      setIsZipping(true);
-      try {
-          const zip = new JSZip();
-          // Create Folder Name
-          const folderParts = [
-              formData.siteName,
-              formData.unit,
-              formData.layer,
-              formData.serialNumber,
-              formData.name
-          ].filter(p => p && p.trim()).join('-');
-          const folderName = folderParts || 'Artifact-Images';
-          const imgFolder = zip.folder(folderName);
-
-          formData.images.forEach((img) => {
-              const fileName = generateFileName(img.view || 'default', img.type, true);
-              // Clean data URL header
-              const base64Data = img.url.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
-              imgFolder?.file(fileName, base64Data, { base64: true });
-          });
-
-          const content = await zip.generateAsync({ type: "blob" });
-          const url = URL.createObjectURL(content);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${folderName}.zip`;
-          link.click();
-          URL.revokeObjectURL(url);
-      } catch (e) {
-          console.error(e);
-          alert("打包失败，请重试");
-      } finally {
-          setIsZipping(false);
       }
   };
 
@@ -617,21 +556,8 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         <Camera size={16} className="text-terra-500"/> 多视角影像
                     </h3>
                     
-                    {/* Action Bar: AI and Download */}
+                    {/* Action Bar: AI */}
                     <div className="flex gap-2 items-center relative">
-                        {/* Download Button */}
-                        <button 
-                            type="button"
-                            onClick={handleBatchDownload}
-                            disabled={!formData.images?.length || isZipping}
-                            className={`p-1.5 rounded-md transition-colors border ${!formData.images?.length ? 'bg-stone-50 text-stone-300 border-stone-100' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50 hover:text-terra-600'}`}
-                            title="打包下载所有图片"
-                        >
-                            {isZipping ? <RotateCw size={14} className="animate-spin" /> : <Archive size={14} />}
-                        </button>
-
-                        <div className="h-4 w-px bg-stone-300 mx-1"></div>
-
                         {/* Model Selector Area */}
                         <div className="relative bg-white border border-stone-200 rounded-md flex items-center p-0.5">
                             {selectedModel === 'custom' ? (

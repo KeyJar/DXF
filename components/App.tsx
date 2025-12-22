@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Search, Database, Trash2, Edit2, Hash, Camera, LayoutGrid, Box, LogOut, Download, Upload, FileSpreadsheet, Menu, X, Save, User as UserIcon, Folder, ChevronRight, Activity, PieChart, Layers, Settings, Lock, Image as ImageIcon, Info, FileText, Server, UserCog, History, Github, Gem } from 'lucide-react';
+import { Plus, Search, Database, Trash2, Edit2, Hash, Camera, LayoutGrid, Box, LogOut, Download, Upload, FileSpreadsheet, Menu, X, Save, User as UserIcon, Folder, ChevronRight, Activity, PieChart, Layers, Settings, Lock, Image as ImageIcon, Info, FileText, Server, UserCog, History, Github, Gem, Archive, Grid, Shapes } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import StatsChart from './StatsChart';
-import ArtifactForm from './ArtifactForm';
-import ArtifactDetails from './ArtifactDetails';
-import LoginScreen from './LoginScreen';
-import AIChatBot from './AIChatBot';
-import { Artifact, User } from '../types';
-import { api } from '../services/api';
+import JSZip from 'jszip';
+import StatsChart from './components/StatsChart';
+import ArtifactForm from './components/ArtifactForm';
+import ArtifactDetails from './components/ArtifactDetails';
+import LoginScreen from './components/LoginScreen';
+import AIChatBot from './components/AIChatBot';
+import { Artifact, User } from './types';
+import { api } from './services/api';
 
 // Simple Logo Component - Sharper Tip, Smooth Handle, Tilted 45 Degrees
 const AppLogo = ({ className }: { className?: string }) => (
@@ -20,7 +21,7 @@ const AppLogo = ({ className }: { className?: string }) => (
 );
 
 // Image Compression Helper
-const compressImage = (file: File, maxWidth = 512, maxHeight = 512): Promise<string> => {
+const compressImage = (file: File, maxWidth = 512): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -38,9 +39,9 @@ const compressImage = (file: File, maxWidth = 512, maxHeight = 512): Promise<str
              width = maxWidth;
            }
         } else {
-           if (height > maxHeight) { 
-             width *= maxHeight / height;
-             height = maxHeight;
+           if (height > maxWidth) { 
+             width *= maxWidth / height;
+             height = maxWidth;
            }
         }
 
@@ -68,6 +69,10 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Export State
+  const [exportMode, setExportMode] = useState<'site' | 'unit' | 'category'>('site');
+  const [isExportingImages, setIsExportingImages] = useState(false);
+
   // --- Form Creation State ---
   const [creationType, setCreationType] = useState<'陶器' | '小件'>('陶器');
   
@@ -212,6 +217,88 @@ const App: React.FC = () => {
           alert("删除失败");
       }
     }
+  };
+
+  // --- Image Batch Export ---
+  const handleBatchImageExport = async () => {
+      const hasImages = artifacts.some(a => a.images && a.images.length > 0);
+      if (!hasImages) {
+          alert("当前没有任何图片可供导出");
+          return;
+      }
+
+      setIsExportingImages(true);
+      try {
+          const zip = new JSZip();
+          const safe = (str: string | undefined) => (str || '').trim().replace(/[\\/:*?"<>|]/g, '_');
+
+          artifacts.forEach(artifact => {
+              if (!artifact.images || artifact.images.length === 0) return;
+
+              // Folder Structure
+              // Base folder name for the artifact itself inside the structure
+              // Format: Serial_Name
+              const serialName = `${safe(artifact.serialNumber)}_${safe(artifact.name)}`;
+              let folderPath = '';
+
+              if (exportMode === 'site') {
+                  // Structure: Site / Unit / Serial_Name
+                  folderPath = `${safe(artifact.siteName)}/${safe(artifact.unit)}/${serialName}`;
+              } else if (exportMode === 'unit') {
+                  // Structure: Unit / Serial_Name
+                  folderPath = `${safe(artifact.unit)}/${serialName}`;
+              } else if (exportMode === 'category') {
+                  // Structure: CategoryType / Serial_Name
+                  folderPath = `${safe(artifact.categoryType)}/${serialName}`;
+              }
+
+              artifact.images.forEach(img => {
+                  // === FILE NAMING RULE ===
+                  // Rule: 遗址名+单位+层位+-编号+ 器名+-照片视角/线图
+                  // Pattern: [Site][Unit][Layer]-[Serial] [Name]-[View].jpg
+                  // Example: 东下冯遗址2025XDH1003①-1 陶鬲-正视图
+                  
+                  const site = safe(artifact.siteName);
+                  const unit = safe(artifact.unit);
+                  const layer = safe(artifact.layer);
+                  const serial = safe(artifact.serialNumber);
+                  const name = safe(artifact.name);
+                  
+                  let viewLabel = img.view || (img.type === 'drawing' ? '线图' : '照片');
+                  // Align standard views to suffix "视图"
+                  if (img.type === 'photo' && ['正','背','左','右','顶','底'].includes(viewLabel)) {
+                      viewLabel += '视图';
+                  }
+
+                  // Construct Filename with spaces and hyphens as requested
+                  const fileName = `${site}${unit}${layer}-${serial} ${name}-${viewLabel}.jpg`;
+                  
+                  // Clean base64 header
+                  const base64Data = img.url.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+                  
+                  // Add to zip
+                  zip.file(`${folderPath}/${fileName}`, base64Data, { base64: true });
+              });
+          });
+
+          // Generate Zip
+          const content = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(content);
+          const link = document.createElement('a');
+          link.href = url;
+          const dateStr = new Date().toISOString().split('T')[0];
+          link.download = `Archaeology_Images_By_${exportMode.charAt(0).toUpperCase() + exportMode.slice(1)}_${dateStr}.zip`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+      } catch (err) {
+          console.error(err);
+          alert("导出失败，请重试");
+      } finally {
+          setIsExportingImages(false);
+      }
   };
 
   // --- Excel Import / Export ---
@@ -572,19 +659,13 @@ const App: React.FC = () => {
                 />
              </div>
              
-             {/* New Registration Button Group */}
+             {/* New Registration Button Only */}
              <div className="flex items-center gap-3 w-full md:w-auto order-1 md:order-2">
                  <button 
-                    onClick={() => { setCreationType('陶器'); setIsEditing(false); setSelectedId(null); setShowForm(true); }}
-                    className="flex-1 md:flex-none px-6 py-3.5 bg-terra-600 hover:bg-terra-700 text-white rounded-full font-bold shadow-lg shadow-terra-600/20 flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm whitespace-nowrap"
+                    onClick={() => { setIsEditing(false); setSelectedId(null); setShowForm(true); }}
+                    className="w-full md:w-auto px-8 py-3.5 bg-terra-600 hover:bg-terra-700 text-white rounded-full font-bold shadow-lg shadow-terra-600/20 flex items-center justify-center gap-2 transition-transform active:scale-95"
                  >
-                    <Plus size={18} /> <span>新增陶器</span>
-                 </button>
-                 <button 
-                    onClick={() => { setCreationType('小件'); setIsEditing(false); setSelectedId(null); setShowForm(true); }}
-                    className="flex-1 md:flex-none px-6 py-3.5 bg-stone-700 hover:bg-stone-800 text-white rounded-full font-bold shadow-lg shadow-stone-700/20 flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm whitespace-nowrap"
-                 >
-                    <Gem size={18} /> <span>新增小件</span>
+                    <Plus size={20} /> <span className="whitespace-nowrap">新增登记</span>
                  </button>
              </div>
           </div>
@@ -824,6 +905,60 @@ const App: React.FC = () => {
                                  <p className="text-stone-500 text-sm">导入导出或备份您的考古记录数据。</p>
                              </div>
                              
+                             {/* New: Bulk Image Export Section - MOVED TO TOP */}
+                             <div className="p-6 rounded-2xl border border-terra-200 bg-terra-50/50 flex flex-col gap-6">
+                                 <div className="flex items-center gap-4">
+                                     <div className="w-12 h-12 rounded-full bg-terra-100 flex items-center justify-center text-terra-700 shrink-0">
+                                         <Archive size={24} />
+                                     </div>
+                                     <div>
+                                         <h4 className="font-bold text-stone-800 text-lg">图片/线图批量导出</h4>
+                                         <p className="text-xs text-stone-500 mt-1">按规则自动命名并整理文件夹层级。</p>
+                                     </div>
+                                 </div>
+
+                                 <div className="bg-white p-4 rounded-xl border border-terra-100">
+                                     <label className="block text-xs font-bold text-stone-500 uppercase mb-3">选择归整模式</label>
+                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                         <button 
+                                            onClick={() => setExportMode('site')}
+                                            className={`px-3 py-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition-all ${exportMode === 'site' ? 'border-terra-500 bg-terra-50 text-terra-700 ring-1 ring-terra-500' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
+                                         >
+                                             <Folder size={16} /> 按遗址归档
+                                         </button>
+                                         <button 
+                                            onClick={() => setExportMode('unit')}
+                                            className={`px-3 py-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition-all ${exportMode === 'unit' ? 'border-terra-500 bg-terra-50 text-terra-700 ring-1 ring-terra-500' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
+                                         >
+                                             <Grid size={16} /> 按单位归档
+                                         </button>
+                                         <button 
+                                            onClick={() => setExportMode('category')}
+                                            className={`px-3 py-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition-all ${exportMode === 'category' ? 'border-terra-500 bg-terra-50 text-terra-700 ring-1 ring-terra-500' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
+                                         >
+                                             <Shapes size={16} /> 按器类归档
+                                         </button>
+                                     </div>
+                                     <div className="mt-3 text-xs text-stone-400 pl-1 font-mono">
+                                         {exportMode === 'site' && '层级: 遗址名 / 单位 / 编号_器名 / 图片'}
+                                         {exportMode === 'unit' && '层级: 单位 / 编号_器名 / 图片'}
+                                         {exportMode === 'category' && '层级: 陶器|小件 / 编号_器名 / 图片'}
+                                     </div>
+                                 </div>
+
+                                 <button 
+                                    onClick={handleBatchImageExport}
+                                    disabled={isExportingImages}
+                                    className="w-full py-3 bg-terra-600 hover:bg-terra-700 text-white rounded-xl font-bold shadow-lg shadow-terra-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                 >
+                                     {isExportingImages ? (
+                                         <span className="flex items-center gap-2"><Archive size={18} className="animate-spin" /> 打包压缩中...</span>
+                                     ) : (
+                                         <span className="flex items-center gap-2"><Download size={18} /> 开始导出 ZIP 包</span>
+                                     )}
+                                 </button>
+                             </div>
+
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  {/* Import Excel */}
                                  <div className="p-6 rounded-2xl border border-stone-200 bg-stone-50 flex flex-col gap-4">
@@ -962,8 +1097,8 @@ const App: React.FC = () => {
                                      </div>
                                      <ul className="list-disc list-inside text-sm text-stone-600 space-y-1">
                                          <li><span className="font-bold text-stone-800">多模型接口支持</span>：新增 DeepSeek (V3/R1) 和 豆包 (Doubao Pro) 模型接口。</li>
-                                         <li>兼容性优化：AI 助手现支持通过 OpenAI 标准协议调用非 Google 模型。</li>
-                                         <li>注意：使用 DeepSeek/豆包时，请确保配置了对应的 API Key (通过环境变量或自定义 Endpoint ID)。</li>
+                                         <li><span className="font-bold text-stone-800">原画质存档</span>：图片上传不再进行压缩，保留原始分辨率（注意存储空间）。</li>
+                                         <li><span className="font-bold text-stone-800">智能整理导出</span>：在数据管理中新增“图片批量导出”功能，支持按遗址/单位/器类自动归档并命名。</li>
                                      </ul>
                                  </div>
 
