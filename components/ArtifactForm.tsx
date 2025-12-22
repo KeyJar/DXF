@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { Artifact, ArtifactCondition, ArtifactImage, ImageType, PhotoView } from '../types';
-import { analyzeArtifactPhoto, analyzeArtifactDrawing } from '../services/geminiService';
-import { Loader2, Sparkles, X, MapPin, Tag, Hash, Layers, Activity, Box, PenTool, ChevronDown, Plus, Trash2, Shapes, Edit3, User, List, Camera, PenTool as PenToolIcon, ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, ChevronLeft, ChevronRight, Image as ImageIcon, ChevronUp, Calendar, Ruler, ScanLine, Sticker, GripVertical, Zap, Brain, Compass, MoveVertical, Map as MapIcon } from 'lucide-react';
+// Removed AI service import
+import { X, MapPin, Tag, Hash, Layers, Activity, Box, PenTool, ChevronDown, Plus, Trash2, Edit3, User, List, Camera, PenTool as PenToolIcon, ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, ChevronLeft, ChevronRight, Image as ImageIcon, Calendar, Ruler, ScanLine, Sticker, GripVertical, Compass, MoveVertical, Map as MapIcon } from 'lucide-react';
 
 interface ArtifactFormProps {
   initialData?: Artifact | null;
@@ -368,13 +368,10 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
 
   const [selectedPhotoView, setSelectedPhotoView] = useState<PhotoView>('正');
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragTarget, setDragTarget] = useState<ImageType | null>(null);
   
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3-flash-preview');
-
   const [previewContext, setPreviewContext] = useState<{ images: ArtifactImage[], index: number } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
@@ -537,67 +534,6 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
   const currentDrawing = useMemo(() => {
     return getImagesByType('drawing')[0] || null;
   }, [formData.images]);
-
-  const handlePhotoAnalysis = async () => {
-    const imageToAnalyze = currentPhoto?.url;
-    if (!imageToAnalyze) {
-      alert("请先在左侧上传照片");
-      return;
-    }
-
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeArtifactPhoto(imageToAnalyze, selectedModel);
-      if (result) {
-        setFormData(prev => ({
-          ...prev,
-          name: result.name || prev.name,
-          material: result.material || prev.material,
-          description: result.description || prev.description
-        }));
-        alert("AI 分析完成，已填入名称、质地和描述");
-      }
-    } catch (error: any) {
-        const msg = error?.message || '';
-        if (msg.includes("不支持图片") || msg.includes("DeepSeek")) {
-             alert(msg);
-        } else {
-             alert("AI 分析服务暂时不可用，请检查网络或 API Key");
-        }
-        console.error(error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleDrawingAnalysis = async () => {
-    const imageToAnalyze = currentDrawing?.url;
-    if (!imageToAnalyze) {
-      alert("请先在左侧上传线图");
-      return;
-    }
-
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeArtifactDrawing(imageToAnalyze, selectedModel);
-      if (result && result.dimensions) {
-        setFormData(prev => ({
-          ...prev,
-          dimensions: result.dimensions || prev.dimensions
-        }));
-        const parsed = parseDimensions(result.dimensions);
-        setDimValues(prev => ({...prev, ...parsed}));
-        alert("AI 尺寸测量分析完成");
-      } else {
-        alert("未能识别出尺寸信息");
-      }
-    } catch (error) {
-        console.error(error);
-        alert("AI 分析服务暂时不可用");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -887,42 +823,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                  <div>
                     <div className="flex justify-between items-center mb-1.5">
                         <label className="text-xs font-bold text-stone-500 ml-1">器物名称 *</label>
-                        <div className="flex items-center gap-2">
-                             <div className="relative group/model">
-                                <select 
-                                    value={selectedModel}
-                                    onChange={(e) => setSelectedModel(e.target.value)}
-                                    className="appearance-none bg-stone-50 border border-stone-200 text-[10px] font-bold text-stone-600 rounded px-2 py-0.5 pr-4 cursor-pointer hover:bg-stone-100 hover:border-terra-300 focus:outline-none transition-colors max-w-[120px]"
-                                    title="选择 AI 模型"
-                                >
-                                    <optgroup label="Gemini 3 (最新预览)">
-                                        <option value="gemini-3-flash-preview">⚡ 3.0 Flash (推荐)</option>
-                                        <option value="gemini-3-pro-preview">🧠 3.0 Pro (最强)</option>
-                                    </optgroup>
-                                    <optgroup label="免费/通用层级">
-                                        <option value="gemini-2.0-flash">🚀 2.0 Flash</option>
-                                        <option value="gemini-flash-latest">✨ 1.5 Flash</option>
-                                        <option value="gemini-flash-lite-latest">🍃 Flash Lite</option>
-                                    </optgroup>
-                                    <optgroup label="DeepSeek (需配置 Key)">
-                                        <option value="deepseek-chat">DeepSeek V3 (Chat)</option>
-                                        <option value="deepseek-reasoner">DeepSeek R1 (推理)</option>
-                                    </optgroup>
-                                </select>
-                                <ChevronDown size={10} className="absolute right-1 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
-                             </div>
-
-                             <button 
-                                type="button" 
-                                onClick={handlePhotoAnalysis}
-                                disabled={isAnalyzing}
-                                className="text-[10px] font-bold text-terra-600 hover:text-terra-700 hover:bg-terra-50 px-2 py-0.5 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0"
-                                title="根据左侧照片自动填写名称、质地和描述"
-                            >
-                                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                                AI 识别
-                            </button>
-                        </div>
+                        {/* AI Button Removed */}
                     </div>
                     <CustomSelect 
                         value={formData.name || ''} 
@@ -1019,16 +920,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         <label className={labelClass.replace('mb-1.5', 'mb-0')}>尺寸信息</label>
                         <span className="text-[10px] text-stone-400 font-normal border border-stone-200 px-1.5 rounded">{dimMode.label}</span>
                      </div>
-                     <button 
-                        type="button" 
-                        onClick={handleDrawingAnalysis}
-                        disabled={isAnalyzing || !currentDrawing}
-                        className="text-[10px] font-bold text-terra-600 hover:text-terra-700 hover:bg-terra-50 px-2 py-1 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="根据左侧线图比例尺自动估算尺寸"
-                    >
-                        {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <ScanLine size={12} />}
-                        AI 测算 (基于线图)
-                    </button>
+                     {/* AI Drawing Button Removed */}
                 </div>
                 
                 <div className="flex gap-4 mb-2">
@@ -1046,7 +938,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({ onSave, onCancel, initialDa
                         </div>
                     ))}
                 </div>
-                <p className="text-[10px] text-stone-400 italic mt-1 ml-1">* 请输入数字，系统将自动格式化。AI 测算结果仅供参考。</p>
+                <p className="text-[10px] text-stone-400 italic mt-1 ml-1">* 请输入数字，系统将自动格式化。</p>
              </div>
 
              {/* Row 7: Personnel (Finder/Recorder) - MOVED HERE */}
