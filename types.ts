@@ -37,9 +37,17 @@ export interface Artifact {
   coordinateE?: string;  // 东坐标
   coordinateZ?: string;  // 高程
 
+  categoryType: '陶器' | '小件'; // NEW: Broad Classification
+  
   name: string;          // 器物名称
-  category?: string;     // 器类 (Deprecated in UI, kept for data compatibility)
+  category?: string;     // 器类 (Legacy field, acts as Sub-category now)
   material: string;      // 质地
+  
+  // NEW: Pottery Specific Fields
+  potteryTexture?: string; // 陶质 (e.g., 夹砂、泥质)
+  potteryColor?: string;   // 陶色 (e.g., 红陶、灰陶)
+  decoration?: string;     // 纹饰 (e.g., 绳纹、弦纹)
+
   quantity: number;      // 数量
   condition: ArtifactCondition | string; // 保存状况
   dimensions: string;    // 尺寸 (e.g., "H: 20cm, D: 10cm")

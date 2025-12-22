@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, Search, Database, Trash2, Edit2, Hash, Camera, LayoutGrid, Box, LogOut, Download, Upload, FileSpreadsheet, Menu, X, Save, User as UserIcon, Folder, ChevronRight, Activity, PieChart, Layers, Settings, Lock, Image as ImageIcon, Info, FileText, Server, UserCog, History, Github } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -213,9 +212,13 @@ const App: React.FC = () => {
        '单位': item.unit,
        '层位': item.layer,
        '编号': item.serialNumber,
+       '类型': item.categoryType,
        '名称': item.name,
        '器类': item.category,
        '质地': item.material,
+       '陶质': item.potteryTexture,
+       '陶色': item.potteryColor,
+       '纹饰': item.decoration,
        '数量': item.quantity,
        '保存状况': item.condition,
        '尺寸': item.dimensions,
@@ -254,9 +257,13 @@ const App: React.FC = () => {
                  unit: row['单位'],
                  layer: row['层位'],
                  serialNumber: row['编号'],
+                 categoryType: row['类型'] === '小件' ? '小件' : '陶器',
                  name: row['名称'] || '未命名器物',
                  category: row['器类'],
                  material: row['质地'],
+                 potteryTexture: row['陶质'],
+                 potteryColor: row['陶色'],
+                 decoration: row['纹饰'],
                  quantity: Number(row['数量']) || 1,
                  condition: row['保存状况'],
                  dimensions: row['尺寸'],
@@ -665,7 +672,7 @@ const App: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3 hidden md:table-cell">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-600">
-                                        {item.material} · {item.category}
+                                        {item.material} · {item.categoryType === '陶器' ? '陶器' : '小件'}
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 text-right pr-6">

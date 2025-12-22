@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Search, Database, Trash2, Edit2, Hash, Camera, LayoutGrid, Box, LogOut, Download, Upload, FileSpreadsheet, Menu, X, Save, User as UserIcon, Folder, ChevronRight, Activity, PieChart, Layers, Settings, Lock, Image as ImageIcon, Info, FileText, Server, UserCog, History, Github } from 'lucide-react';
+import { Plus, Search, Database, Trash2, Edit2, Hash, Camera, LayoutGrid, Box, LogOut, Download, Upload, FileSpreadsheet, Menu, X, Save, User as UserIcon, Folder, ChevronRight, Activity, PieChart, Layers, Settings, Lock, Image as ImageIcon, Info, FileText, Server, UserCog, History, Github, Gem } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import StatsChart from './StatsChart';
 import ArtifactForm from './ArtifactForm';
 import ArtifactDetails from './ArtifactDetails';
 import LoginScreen from './LoginScreen';
+import AIChatBot from './AIChatBot';
 import { Artifact, User } from '../types';
 import { api } from '../services/api';
 
@@ -19,7 +20,7 @@ const AppLogo = ({ className }: { className?: string }) => (
 );
 
 // Image Compression Helper
-const compressImage = (file: File, maxWidth = 512): Promise<string> => {
+const compressImage = (file: File, maxWidth = 512, maxHeight = 512): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -37,9 +38,9 @@ const compressImage = (file: File, maxWidth = 512): Promise<string> => {
              width = maxWidth;
            }
         } else {
-           if (height > maxWidth) { 
-             width *= maxWidth / height;
-             height = maxWidth;
+           if (height > maxHeight) { 
+             width *= maxHeight / height;
+             height = maxHeight;
            }
         }
 
@@ -66,6 +67,9 @@ const App: React.FC = () => {
   const [settingsTab, setSettingsTab] = useState<'data' | 'profile' | 'about' | 'changelog'>('data');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // --- Form Creation State ---
+  const [creationType, setCreationType] = useState<'陶器' | '小件'>('陶器');
   
   // --- Mobile State ---
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -161,7 +165,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSave = async (data: Omit<Artifact, 'id' | 'createdAt'>) => {
+  const handleSave = async (data: Omit<Artifact, 'id' | 'createdAt'>, closeForm: boolean) => {
     if (isEditing && selectedId) {
       const currentArtifact = artifacts.find(a => a.id === selectedId);
       if (currentArtifact) {
@@ -169,8 +173,10 @@ const App: React.FC = () => {
         try {
             await api.saveArtifact(updatedArtifact);
             setArtifacts(prev => prev.map(a => a.id === selectedId ? updatedArtifact : a));
-            setIsEditing(false);
-            setShowForm(false);
+            if (closeForm) {
+                setIsEditing(false);
+                setShowForm(false);
+            }
         } catch (err) {
             alert("保存失败");
         }
@@ -184,7 +190,9 @@ const App: React.FC = () => {
       try {
           await api.saveArtifact(newArtifact);
           setArtifacts(prev => [newArtifact, ...prev]);
-          setShowForm(false);
+          if (closeForm) {
+            setShowForm(false);
+          }
           setSelectedId(null); 
       } catch(err) {
           alert("保存失败");
@@ -213,9 +221,13 @@ const App: React.FC = () => {
        '单位': item.unit,
        '层位': item.layer,
        '编号': item.serialNumber,
+       '类型': item.categoryType,
        '名称': item.name,
        '器类': item.category,
        '质地': item.material,
+       '陶质': item.potteryTexture,
+       '陶色': item.potteryColor,
+       '纹饰': item.decoration,
        '数量': item.quantity,
        '保存状况': item.condition,
        '尺寸': item.dimensions,
@@ -254,9 +266,13 @@ const App: React.FC = () => {
                  unit: row['单位'],
                  layer: row['层位'],
                  serialNumber: row['编号'],
+                 categoryType: row['类型'] === '小件' ? '小件' : '陶器',
                  name: row['名称'] || '未命名器物',
                  category: row['器类'],
                  material: row['质地'],
+                 potteryTexture: row['陶质'],
+                 potteryColor: row['陶色'],
+                 decoration: row['纹饰'],
                  quantity: Number(row['数量']) || 1,
                  condition: row['保存状况'],
                  dimensions: row['尺寸'],
@@ -556,13 +572,19 @@ const App: React.FC = () => {
                 />
              </div>
              
-             {/* New Registration Button Only */}
+             {/* New Registration Button Group */}
              <div className="flex items-center gap-3 w-full md:w-auto order-1 md:order-2">
                  <button 
-                    onClick={() => { setIsEditing(false); setSelectedId(null); setShowForm(true); }}
-                    className="w-full md:w-auto px-8 py-3.5 bg-terra-600 hover:bg-terra-700 text-white rounded-full font-bold shadow-lg shadow-terra-600/20 flex items-center justify-center gap-2 transition-transform active:scale-95"
+                    onClick={() => { setCreationType('陶器'); setIsEditing(false); setSelectedId(null); setShowForm(true); }}
+                    className="flex-1 md:flex-none px-6 py-3.5 bg-terra-600 hover:bg-terra-700 text-white rounded-full font-bold shadow-lg shadow-terra-600/20 flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm whitespace-nowrap"
                  >
-                    <Plus size={20} /> <span className="whitespace-nowrap">新增登记</span>
+                    <Plus size={18} /> <span>新增陶器</span>
+                 </button>
+                 <button 
+                    onClick={() => { setCreationType('小件'); setIsEditing(false); setSelectedId(null); setShowForm(true); }}
+                    className="flex-1 md:flex-none px-6 py-3.5 bg-stone-700 hover:bg-stone-800 text-white rounded-full font-bold shadow-lg shadow-stone-700/20 flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm whitespace-nowrap"
+                 >
+                    <Gem size={18} /> <span>新增小件</span>
                  </button>
              </div>
           </div>
@@ -665,7 +687,7 @@ const App: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3 hidden md:table-cell">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-600">
-                                        {item.material} · {item.category}
+                                        {item.material} · {item.categoryType === '陶器' ? '陶器' : '小件'}
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 text-right pr-6">
@@ -787,7 +809,7 @@ const App: React.FC = () => {
                      </nav>
 
                      <div className="mt-auto hidden md:block px-4 py-4">
-                        <div className="text-[10px] text-stone-400 font-mono">Archaeology v1.3.0</div>
+                        <div className="text-[10px] text-stone-400 font-mono">Archaeology v1.5.0</div>
                      </div>
                  </div>
 
@@ -931,45 +953,43 @@ const App: React.FC = () => {
 
                              <div className="space-y-8 relative before:absolute before:inset-0 before:ml-2.5 before:w-0.5 before:-translate-x-px before:bg-stone-200 before:h-full">
                                  
-                                 {/* v1.3.0 - Today */}
+                                 {/* v1.5.0 - Today */}
+                                 <div className="relative pl-8">
+                                     <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border-4 border-white bg-terra-600 shadow-sm animate-pulse"></div>
+                                     <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
+                                         <h4 className="font-bold text-stone-900 text-lg">v1.5.0</h4>
+                                         <span className="text-xs font-mono text-terra-600 font-bold">最新发布</span>
+                                     </div>
+                                     <ul className="list-disc list-inside text-sm text-stone-600 space-y-1">
+                                         <li><span className="font-bold text-stone-800">多模型接口支持</span>：新增 DeepSeek (V3/R1) 和 豆包 (Doubao Pro) 模型接口。</li>
+                                         <li>兼容性优化：AI 助手现支持通过 OpenAI 标准协议调用非 Google 模型。</li>
+                                         <li>注意：使用 DeepSeek/豆包时，请确保配置了对应的 API Key (通过环境变量或自定义 Endpoint ID)。</li>
+                                     </ul>
+                                 </div>
+
+                                 {/* v1.4.0 */}
                                  <div className="relative pl-8">
                                      <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border-4 border-white bg-terra-500 shadow-sm"></div>
                                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
-                                         <h4 className="font-bold text-stone-800 text-lg">v1.3.0</h4>
-                                         <span className="text-xs font-mono text-stone-400">今日</span>
+                                         <h4 className="font-bold text-stone-700 text-lg">v1.4.0</h4>
+                                         <span className="text-xs font-mono text-stone-400">历史版本</span>
                                      </div>
                                      <ul className="list-disc list-inside text-sm text-stone-600 space-y-1">
-                                         <li><span className="font-bold text-terra-600">修复</span>：个人信息（头像/昵称）离线状态下无法保存的问题。</li>
-                                         <li><span className="font-bold text-terra-600">新增</span>：全量数据备份功能，支持一键导出所有数据为 JSON 文件。</li>
-                                         <li>优化：数据管理界面布局，整合备份与恢复选项。</li>
+                                         <li><span className="font-bold text-stone-800">UI 交互优化</span>：新增陶器/小件模式的分段式切换控件，操作更直观。</li>
+                                         <li><span className="font-bold text-stone-800">AI 模型升级</span>：集成 Google Gemini 多模型切换（Flash/Pro/自定义）。</li>
                                      </ul>
                                  </div>
 
-                                 {/* v1.2.0 */}
+                                 {/* v1.3.0 */}
                                  <div className="relative pl-8">
                                      <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border-4 border-white bg-stone-400"></div>
-                                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
-                                         <h4 className="font-bold text-stone-700 text-lg">v1.2.0</h4>
-                                         <span className="text-xs font-mono text-stone-400">近期更新</span>
+                                     <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
+                                         <h4 className="font-bold text-stone-700 text-lg">v1.3.0</h4>
+                                         <span className="text-xs font-mono text-stone-400">数据安全</span>
                                      </div>
                                      <ul className="list-disc list-inside text-sm text-stone-600 space-y-1">
-                                         <li>新增 <span className="font-bold text-stone-800">DeepSeek</span> AI 模型支持 (V3/R1)。</li>
-                                         <li>重构系统设置面板，新增“关于应用”和“更新日志”模块。</li>
-                                         <li>优化顶部导航栏布局，提升移动端操作体验。</li>
-                                     </ul>
-                                 </div>
-
-                                 {/* v1.1.0 */}
-                                 <div className="relative pl-8">
-                                     <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border-4 border-white bg-stone-300"></div>
-                                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
-                                         <h4 className="font-bold text-stone-500 text-lg">v1.1.0</h4>
-                                         <span className="text-xs font-mono text-stone-400">初始版本</span>
-                                     </div>
-                                     <ul className="list-disc list-inside text-sm text-stone-600 space-y-1">
-                                         <li>新增数据可视化仪表盘 (StatsChart)。</li>
-                                         <li>支持线图 (Drawing) 测量分析功能。</li>
-                                         <li>基础文物信息录入与 Excel 导入导出。</li>
+                                         <li><span className="font-bold text-terra-600">新增</span>：全量数据备份功能，支持一键导出所有数据为 JSON 文件。</li>
+                                         <li>修复个人信息保存问题。</li>
                                      </ul>
                                  </div>
 
@@ -1046,11 +1066,15 @@ const App: React.FC = () => {
              <ArtifactForm 
                 initialData={isEditing && selectedId ? selectedArtifact : null}
                 existingArtifacts={artifacts}
+                defaultCategoryType={creationType}
                 onSave={handleSave}
                 onCancel={() => setShowForm(false)}
              />
         </div>
       )}
+
+      {/* Floating AI Chat Bot */}
+      <AIChatBot />
     </div>
   );
 };
